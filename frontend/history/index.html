@@ -1,0 +1,1267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="/fonts.css">
+  <title>Order History - Hestia POS</title>
+  <link rel="stylesheet" href="/tailwind.css">
+  <script src="/shared-dialog.js"></script>
+  <script defer src="/alpine.min.js"></script>
+  <style>
+    :root {
+      --cream: #F9F5EE;
+      --cream-dark: #EDE8DC;
+      --espresso: #2C1810;
+      --espresso-mid: #4A2C1A;
+      --roast: #7B3F1E;
+      --caramel: #C97B2E;
+      --caramel-light: #E8A84E;
+      --foam: #FDF8F0;
+      --muted: #8C7B6B;
+      --border: rgba(44,24,16,0.12);
+      --border-strong: rgba(44,24,16,0.25);
+      --green: #5B6B5A;
+      --blue: #4A6FA5;
+      --bg: #F9F5EE;
+      --bg-elevated: #FDF8F0;
+      --text: #2C1810;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 0;
+      background: var(--cream);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+    }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .serif { font-family: 'DM Serif Display', serif; }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 1.5rem;
+      height: 56px;
+      background: var(--espresso);
+      border-bottom: 1px solid var(--border-strong);
+      position: sticky; top: 0; z-index: 100;
+    }
+    .header-title {
+      font-size: 18px;
+      font-family: 'DM Serif Display', serif;
+      color: var(--caramel-light);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .header-btn {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: rgba(255,255,255,0.8);
+      padding: 7px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-family: 'DM Sans', sans-serif;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .header-btn:hover { background: rgba(255,255,255,0.18); }
+    .main { padding: 1.5rem; max-width: 1200px; margin: 0 auto; }
+    .history-grid {
+      display: grid;
+      gap: 12px;
+    }
+    .history-card {
+      background: var(--foam);
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 16px;
+      align-items: center;
+      cursor: pointer;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .history-card:hover { border-color: var(--caramel); box-shadow: 0 4px 12px rgba(201,123,46,0.1); }
+    .history-type {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      background: var(--cream-dark);
+      color: var(--muted);
+    }
+    .history-type.takeout { background: var(--caramel); color: #fff; }
+    .history-type.dinein { background: var(--espresso-mid); color: #fff; }
+    .history-info { display: flex; flex-direction: column; gap: 4px; }
+    .history-id {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .history-meta {
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    .history-total {
+      text-align: right;
+    }
+    .history-total-amount {
+      font-size: 18px;
+      font-family: 'DM Serif Display', serif;
+      color: var(--text);
+    }
+    .history-payment {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .empty {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: var(--muted);
+    }
+    .empty-icon { font-size: 40px; margin-bottom: 12px; opacity: 0.3; }
+    .loading {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: var(--muted);
+    }
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(44,24,16,0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .modal-content {
+      background: var(--foam);
+      border: 1.5px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      max-width: 600px;
+      width: 100%;
+      margin: 20px;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .modal-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin: 0;
+    }
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 24px;
+      cursor: pointer;
+      padding: 0;
+    }
+    .modal-close:hover { color: var(--text); }
+    .order-items-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+    }
+    .order-items-table th, .order-items-table td {
+      padding: 8px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    .order-items-table th {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .order-summary {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+    .order-summary-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+    .order-summary-row.total {
+      font-weight: 700;
+      font-size: 16px;
+      margin-top: 12px;
+    }
+
+    /* Tabs */
+    .tab-nav {
+      display: flex;
+      gap: 24px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 4px;
+    }
+    .tab-btn {
+      background: none;
+      border: none;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 8px 4px;
+      position: relative;
+      transition: color 0.15s;
+    }
+    .tab-btn.active { color: var(--caramel); }
+    .tab-btn.active::after {
+      content: '';
+      position: absolute;
+      bottom: -5px;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--caramel);
+      border-radius: 3px;
+    }
+    .tab-btn:hover { color: var(--text); }
+
+    .report-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--foam);
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .report-table th {
+      background: var(--espresso);
+      color: var(--caramel-light);
+      text-align: left;
+      padding: 12px 16px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .report-table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+    }
+    .report-table tr:last-child td { border-bottom: none; }
+  </style>
+  <link rel="stylesheet" href="/theme.css">
+  <script src="/brand.js"></script>
+  <script src="/shared-sse.js"></script>
+  
+  <script src="/print-bill.js"></script>
+  <script src="/print-kot.js"></script>
+</head>
+<body x-data="historyApp()" x-init="init()">
+  <div class="header">
+    <div class="header-title">
+      <span>📋</span> Order History
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <button type="button" @click="exportXLSX()" class="header-btn">Export Excel</button>
+      <button type="button" @click="exportCSV()" class="header-btn">Export CSV</button>
+      <button type="button" @click="window.location.href='/'" class="header-btn">Back to Dashboard</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="tab-nav">
+      <button class="tab-btn" :class="activeTab === 'bills' ? 'active' : ''" @click="activeTab = 'bills'; loadHistory()">Bills History</button>
+      <button class="tab-btn" :class="activeTab === 'dues' ? 'active' : ''" @click="activeTab = 'dues'; loadDues()">Dues</button>
+      <button class="tab-btn" :class="activeTab === 'items' ? 'active' : ''" @click="activeTab = 'items'; loadItemReport()">Items Report</button>
+    </div>
+
+    <!-- Summary Box (Only for Bills History) -->
+    <div x-show="activeTab === 'bills'" style="background: var(--espresso); color: #fff; border-radius: 12px; padding: 24px; margin-bottom: 16px;">
+      <div style="font-size: 11px; font-weight: 600; color: var(--caramel-light); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px;">Total Sales</div>
+      <div style="font-size: 32px; font-weight: 800; margin-bottom: 16px;" x-text="formatCurrency(totalSales)"></div>
+      
+      <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; border-top: 1px solid rgba(255,255,255,0.15); padding-top: 16px;">
+        <div>
+          <div style="font-size: 10px; color: rgba(255,255,255,0.5); text-transform: uppercase;">Cash</div>
+          <div style="font-size: 14px; font-weight: 600;" x-text="formatCurrency(salesByMethod.cash || 0)"></div>
+        </div>
+        <div>
+          <div style="font-size: 10px; color: rgba(255,255,255,0.5); text-transform: uppercase;">UPI</div>
+          <div style="font-size: 14px; font-weight: 600;" x-text="formatCurrency(salesByMethod.online || 0)"></div>
+        </div>
+        <div>
+          <div style="font-size: 10px; color: rgba(255,255,255,0.5); text-transform: uppercase;">Card</div>
+          <div style="font-size: 14px; font-weight: 600;" x-text="formatCurrency(salesByMethod.card || 0)"></div>
+        </div>
+        <div>
+          <div style="font-size: 10px; color: rgba(255,255,255,0.5); text-transform: uppercase;">Due</div>
+          <div style="font-size: 14px; font-weight: 600;" x-text="formatCurrency(salesByMethod.due || 0)"></div>
+        </div>
+        <div>
+          <div style="font-size: 10px; color: rgba(255,255,255,0.5); text-transform: uppercase;">Bills</div>
+          <div style="font-size: 14px; font-weight: 600;" x-text="filtered.length"></div>
+        </div>
+      </div>
+    </div>
+
+    <div x-show="activeTab === 'dues'" style="background: var(--espresso); color: #fff; border-radius: 12px; padding: 24px; margin-bottom: 16px;">
+      <div style="font-size: 11px; font-weight: 600; color: var(--caramel-light); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px;">Open Dues</div>
+      <div style="font-size: 32px; font-weight: 800; margin-bottom: 16px;" x-text="formatCurrency(totalOpenDuePayable)"></div>
+      <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:16px; border-top: 1px solid rgba(255,255,255,0.15); padding-top: 16px;">
+        <div>
+          <div style="font-size: 10px; color: rgba(255,255,255,0.5); text-transform: uppercase;">Customers</div>
+          <div style="font-size: 14px; font-weight: 600;" x-text="filteredDues.length"></div>
+        </div>
+        <div>
+          <div style="font-size: 10px; color: rgba(255,255,255,0.5); text-transform: uppercase;">Outstanding Subtotal</div>
+          <div style="font-size: 14px; font-weight: 600;" x-text="formatCurrency(totalOpenDueSubtotal)"></div>
+        </div>
+        <div>
+          <div style="font-size: 10px; color: rgba(255,255,255,0.5); text-transform: uppercase;">Open Bills</div>
+          <div style="font-size: 14px; font-weight: 600;" x-text="filteredDues.reduce((sum, row) => sum + ((row.open_due_bills || []).length), 0)"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filters (Visible for both tabs) -->
+    <div style="background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 12px; padding: 16px; display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 16px;">
+      <div>
+        <label style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; display: block; margin-bottom: 6px;">Type</label>
+        <select x-model="filterType" @change="activeTab === 'bills' ? loadHistory() : loadItemReport()" style="background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 8px; font-size: 13px; min-width: 100px;">
+          <option value="">All Types</option>
+          <option value="table">Dine-in</option>
+          <option value="takeout">Takeout</option>
+        </select>
+      </div>
+      
+      <div x-show="activeTab === 'bills'">
+        <label style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; display: block; margin-bottom: 6px;">Settled By</label>
+        <select x-model="filterSettledBy" @change="loadHistory()" style="background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 8px; font-size: 13px; min-width: 130px;">
+          <option value="">All Staff</option>
+          <template x-for="opt in settledByOptions" :key="opt">
+            <option :value="opt" x-text="opt"></option>
+          </template>
+        </select>
+      </div>
+
+      <div x-show="activeTab === 'bills'">
+        <label style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; display: block; margin-bottom: 6px;">Bill Order</label>
+        <button
+          type="button"
+          @click="billSortOrder = billSortOrder === 'desc' ? 'asc' : 'desc'"
+          style="background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 8px; font-size: 13px; min-width: 150px; font-weight: 600; cursor: pointer;"
+          x-text="billSortOrder === 'desc' ? 'Bill # Descending' : 'Bill # Ascending'"></button>
+      </div>
+
+      <div x-show="activeTab === 'dues'">
+        <label style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; display: block; margin-bottom: 6px;">Search Customer</label>
+        <input x-model="dueSearch" placeholder="Name or phone" style="background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 8px; font-size: 13px; min-width: 180px;">
+      </div>
+
+      <div x-show="activeTab === 'items'">
+        <label style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; display: block; margin-bottom: 6px;">KOT Puncher</label>
+        <select x-model="filterStaffId" @change="loadItemReport()" style="background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 8px; font-size: 13px; min-width: 130px;">
+          <option value="all">All Staff</option>
+          <option value="main_pos">Main POS</option>
+          <template x-for="s in staffOptions" :key="s.id">
+            <option :value="s.id" x-text="s.name"></option>
+          </template>
+        </select>
+      </div>
+
+      <div>
+        <label style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; display: block; margin-bottom: 6px;">From</label>
+        <input type="date" x-model="filterFrom" @change="activeTab === 'bills' ? loadHistory() : loadItemReport()" style="background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 8px; font-size: 13px;">
+      </div>
+      <div>
+        <label style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; display: block; margin-bottom: 6px;">To</label>
+        <input type="date" x-model="filterTo" @change="activeTab === 'bills' ? loadHistory() : loadItemReport()" style="background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 8px; font-size: 13px;">
+      </div>
+      <div style="margin-left: auto;">
+        <button type="button" @click="clearFilters()" style="background: var(--cream-dark); border: none; color: var(--text); padding: 9px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer;">Clear Filters</button>
+      </div>
+    </div>
+
+    <template x-if="loading">
+      <div class="loading">Loading...</div>
+    </template>
+
+    <template x-if="!loading && activeTab === 'bills' && history.length === 0">
+      <div class="empty">
+        <div class="empty-icon">📭</div>
+        No order history found
+      </div>
+    </template>
+
+    <div x-show="!loading && activeTab === 'bills' && history.length > 0" class="history-grid">
+      <template x-for="bill in filtered" :key="bill.id">
+        <div class="history-card" @click="selectedBill = bill; editingMethod = false; showModal = true">
+          <div>
+            <div class="history-type" :class="bill.session_type === 'takeout' ? 'takeout' : 'dinein'"
+              x-text="bill.session_type === 'takeout' ? 'Takeout' : 'Dine-in'"></div>
+          </div>
+          <div class="history-info">
+            <div class="history-id">
+              <span x-text="bill.session_type === 'takeout' ? 'Takeout #' + (pickupShort(bill.pickup_code) || '???') : 'Table ' + (bill.table_number || '???')"></span>
+              <span style="color:var(--muted); font-size:12px; margin-left:8px;" class="mono" x-text="'Bill #' + bill.id"></span>
+            </div>
+            <div style="font-size: 11px; color: var(--muted);" x-text="'Settled by: ' + (bill.settled_by || 'Unknown')"></div>
+            <div class="history-meta">
+              <span x-text="formatHistorySettledAt(bill)"></span>
+              <span x-show="Number(bill.linked_due_recovered_payable || 0) > 0" x-text="'Prev Due Cleared ' + formatCurrency(bill.linked_due_recovered_payable || 0)"></span>
+            </div>
+          </div>
+          <div class="history-total">
+            <div class="history-total-amount" x-text="formatCurrency(historyAmount(bill))"></div>
+            <div class="history-payment" x-text="paymentSummary(bill)"></div>
+            <div style="font-size:11px; color:var(--muted); margin-top:2px;" x-text="bill.items.length + ' items'"></div>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- Items Report Tab -->
+    <div x-show="activeTab === 'items' && !loading">
+      <template x-if="itemReport.length === 0">
+        <div class="empty">
+          <div class="empty-icon">📊</div>
+          No items report data found for selected filters
+        </div>
+      </template>
+      <template x-if="itemReport.length > 0">
+        <table class="report-table">
+          <thead>
+            <tr>
+              <th>Item Name</th>
+              <th style="text-align:center;">Qty Sold</th>
+              <th style="text-align:right;">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="row in itemReport" :key="row.name">
+              <tr>
+                <td x-text="row.name"></td>
+                <td style="text-align:center; font-weight:700;" x-text="row.quantity"></td>
+                <td style="text-align:right; font-weight:600;" x-text="formatCurrency(row.amount)"></td>
+              </tr>
+            </template>
+            <tr style="background: var(--cream-dark); font-weight:700;">
+              <td>TOTAL</td>
+              <td style="text-align:center;" x-text="itemReport.reduce((s,r) => s + r.quantity, 0)"></td>
+              <td style="text-align:right;" x-text="formatCurrency(itemReport.reduce((s,r) => s + r.amount, 0))"></td>
+            </tr>
+          </tbody>
+        </table>
+      </template>
+    </div>
+
+    <div x-show="activeTab === 'dues' && !loading">
+      <template x-if="filteredDues.length === 0">
+        <div class="empty">
+          <div class="empty-icon">🧾</div>
+          No open dues found
+        </div>
+      </template>
+      <div x-show="filteredDues.length > 0" class="history-grid">
+        <template x-for="due in filteredDues" :key="due.phone || due.customer_id">
+          <div class="history-card" style="grid-template-columns: 1fr auto;">
+            <div class="history-info">
+              <div class="history-id">
+                <span x-text="due.name || 'Unknown Customer'"></span>
+                <span style="color:var(--muted); font-size:12px; margin-left:8px;" class="mono" x-text="due.phone || 'No phone'"></span>
+              </div>
+              <div style="font-size: 11px; color: var(--muted);" x-text="(due.open_due_bills || []).length + ' open due bill(s)'"></div>
+              <div class="history-meta">
+                <span x-text="'Subtotal ' + formatCurrency(due.outstanding_subtotal || 0)"></span>
+                <span x-text="'Last activity ' + formatDate(due.last_entry_at)"></span>
+              </div>
+              <div style="margin-top:8px; padding-top:8px; border-top:1px dashed var(--border);">
+                <template x-for="bill in (due.open_due_bills || [])" :key="bill.bill_id">
+                  <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--muted); margin-bottom:4px;">
+                    <span x-text="'Bill #' + bill.bill_id + ' · ' + (bill.session_type === 'takeout' ? ('Takeout ' + (pickupShort(bill.pickup_code) || '')) : ('Table ' + (bill.table_number || '')))"></span>
+                    <span x-text="formatCurrency(bill.open_due_payable || 0)"></span>
+                  </div>
+                </template>
+              </div>
+            </div>
+            <div class="history-total">
+              <div class="history-total-amount" x-text="formatCurrency(due.outstanding_payable || 0)"></div>
+              <div class="history-payment">Open Due</div>
+              <button type="button" @click="openSettleDue(due)" style="margin-top:10px; background:var(--espresso); color:var(--caramel-light); border:none; padding:8px 12px; border-radius:8px; cursor:pointer; font-size:12px; font-weight:600;">Settle</button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bill Details Modal -->
+  <div x-show="showModal" class="modal" @click.self="showModal = false">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title" x-text="selectedBill ? (selectedBill.session_type === 'takeout' ? 'Takeout #' + pickupShort(selectedBill.pickup_code) : 'Table ' + selectedBill.table_number) + ' — Bill #' + selectedBill.id : ''"></h2>
+        <button type="button" @click="showModal = false" class="modal-close">&times;</button>
+      </div>
+      <template x-if="selectedBill">
+        <div>
+          <div style="display:flex; gap:24px; margin-bottom:16px; font-size:13px;">
+            <div><span style="color:var(--muted);">Settled</span><br><span x-text="formatHistorySettledAt(selectedBill)"></span></div>
+            <div><span style="color:var(--muted);">Settled By</span><br><span x-text="selectedBill.settled_by || 'Unknown'"></span></div>
+            <div>
+              <span style="color:var(--muted);">Payment</span><br>
+              <template x-if="!editingMethod">
+                <span x-text="paymentSummary(selectedBill)"></span>
+              </template>
+              <template x-if="editingMethod">
+                <select x-model="editMethod" style="font-size:13px; border:1px solid var(--border); border-radius:6px; padding:2px 6px; background:var(--bg);">
+                  <option value="cash">Cash</option>
+                  <option value="upi_offline">UPI</option>
+                  <option value="card_offline">Card</option>
+                  <option value="split">Split</option>
+                </select>
+              </template>
+            </div>
+          </div>
+          <template x-if="editingMethod && editMethod === 'split'">
+            <div style="margin-bottom:12px; padding:10px; border:1px dashed var(--border); border-radius:8px;">
+              <div style="font-size:12px; font-weight:600; color:var(--muted); margin-bottom:8px; text-transform:uppercase;">Edit Split Payment</div>
+              <template x-for="(row, i) in editSplitRows" :key="i">
+                <div style="margin-bottom:8px;">
+                  <div style="display:flex; gap:6px; align-items:center;">
+                    <select x-model="row.method" style="flex:1; font-size:12px; border:1px solid var(--border); border-radius:6px; padding:5px; background:var(--bg);">
+                      <option value="cash">Cash</option>
+                      <option value="upi_offline">UPI</option>
+                      <option value="card_offline">Card</option>
+                    </select>
+                    <input type="number" x-model.number="row.amount" @input="editSplitAutoFill(i)" min="0" step="0.01" placeholder="Amount"
+                      style="width:110px; font-size:12px; border:1px solid var(--border); border-radius:6px; padding:5px; background:var(--bg);">
+                    <button type="button" @click="removeEditSplitRow(i)" x-show="editSplitRows.length > 1"
+                      style="background:none; border:none; color:#dc2626; font-size:16px; cursor:pointer;">&times;</button>
+                  </div>
+                  <input type="text" x-show="row.method !== 'cash'" x-model="row.comment" placeholder="Comment (optional)"
+                    style="margin-top:6px; width:100%; font-size:12px; border:1px solid var(--border); border-radius:6px; padding:6px; background:var(--bg);">
+                </div>
+              </template>
+              <div style="display:flex; gap:8px;">
+                <button type="button" @click="addEditSplitRow()"
+                  style="padding:6px 10px; border-radius:6px; border:1px dashed var(--border); background:transparent; font-size:12px; cursor:pointer;">+ Add Row</button>
+                <div style="font-size:12px; color:var(--muted); margin-left:auto;">
+                  Entered: <span x-text="formatCurrency(editSplitTotal())"></span>
+                </div>
+              </div>
+            </div>
+          </template>
+          <template x-if="editingMethod && editMethod !== 'split' && editMethod !== 'cash'">
+            <div style="margin-bottom:12px;">
+              <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Payment Comment</label>
+              <input type="text" x-model="editComment" placeholder="Comment (optional)"
+                style="width:100%; font-size:12px; border:1px solid var(--border); border-radius:6px; padding:7px; background:var(--bg);">
+            </div>
+          </template>
+          <template x-for="grp in groupedOrders(selectedBill)" :key="grp.order_id">
+            <div style="margin-bottom:12px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 4px;">
+                <span style="font-size:12px;font-weight:600;color:var(--muted);">Order #<span x-text="grp.order_id"></span></span>
+                <button type="button" @click="reprintKOT(selectedBill, grp)"
+                  style="padding:2px 10px;font-size:11px;background:var(--espresso);color:var(--caramel-light);border:none;border-radius:6px;cursor:pointer;">Reprint KOT</button>
+              </div>
+              <table class="order-items-table">
+                <thead><tr><th>Item</th><th>Qty</th><th>Unit</th><th>Line</th></tr></thead>
+                <tbody>
+                  <template x-for="item in grp.items" :key="item.name + item.price">
+                    <tr>
+                      <td>
+                        <div x-text="item.name"></div>
+                        <template x-for="v in item.variants || []" :key="v.label">
+                          <div style="font-size:11px; color:var(--muted); margin-top:1px;">&bull; <span x-text="v.label"></span></div>
+                        </template>
+                      </td>
+                      <td x-text="item.quantity"></td>
+                      <td x-text="formatCurrency(item.price)"></td>
+                      <td x-text="formatCurrency(item.price * item.quantity)"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </template>
+          <div class="order-summary">
+            <div class="order-summary-row"><span>Session Basic Amount</span><span x-text="formatCurrency(billSubtotal(selectedBill))"></span></div>
+            <div class="order-summary-row" x-show="Number(selectedBill.linked_due_recovered_payable || 0) > 0"><span>Previous Due Cleared</span><span x-text="formatCurrency(selectedBill.linked_due_recovered_payable || 0)"></span></div>
+            <div class="order-summary-row"><span>GST (5%)</span><span x-text="formatExactCurrency(billTax(selectedBill))"></span></div>
+            <div class="order-summary-row total"><span>History Row Amount</span><span x-text="formatCurrency(historyAmount(selectedBill))"></span></div>
+            
+            <template x-if="historySplitPayments(selectedBill).length">
+              <div style="margin-top:12px; padding-top:12px; border-top:1px dashed var(--border);">
+                <div style="font-size:12px; font-weight:600; color:var(--muted); margin-bottom:8px; text-transform:uppercase;">Payment Breakdown</div>
+                <template x-for="(p, idx) in historySplitPayments(selectedBill)" :key="idx">
+                  <div class="order-summary-row" style="margin-bottom:4px; font-size:13px;">
+                    <span>
+                      <span x-text="formatPayment(p.method)"></span>
+                      <span x-show="p.comment" style="color:var(--muted);" x-text="' (' + p.comment + ')'"></span>
+                    </span>
+                    <span x-text="formatCurrency(p.amount || 0)"></span>
+                  </div>
+                </template>
+              </div>
+            </template>
+            <template x-if="selectedBill.due_settlements && selectedBill.due_settlements.length">
+              <div style="margin-top:12px; padding-top:12px; border-top:1px dashed var(--border);">
+                <div style="font-size:12px; font-weight:600; color:var(--muted); margin-bottom:8px; text-transform:uppercase;">Due Settlement Breakdown</div>
+                <template x-for="p in selectedBill.due_settlements" :key="p.id">
+                  <div class="order-summary-row" style="margin-bottom:4px; font-size:13px;">
+                    <span>
+                      <span x-text="formatPayment(p.payment_method)"></span>
+                      <span x-show="p.comment" style="color:var(--muted);" x-text="' (' + p.comment + ')'"></span>
+                    </span>
+                    <span x-text="formatCurrency(p.amount_payable || 0)"></span>
+                  </div>
+                </template>
+              </div>
+            </template>
+          </div>
+          <div style="display:flex; gap:8px; margin-top:16px; flex-wrap:wrap;">
+            <button type="button" @click="reprintBill(selectedBill)"
+              style="flex:1; padding:9px 16px; background:var(--espresso); color:var(--caramel-light); border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer;">🖨 Reprint</button>
+            <template x-if="!editingMethod">
+              <button type="button" @click="startEdit()"
+                style="flex:1; padding:9px 16px; background:transparent; color:var(--text); border:1.5px solid var(--border-strong); border-radius:8px; font-size:13px; font-weight:600; cursor:pointer;">✏️ Edit Method</button>
+            </template>
+            <template x-if="editingMethod">
+              <button type="button" @click="saveEdit()"
+                style="flex:1; padding:9px 16px; background:#2D5A2D; color:#fff; border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer;">Save</button>
+            </template>
+            <template x-if="editingMethod">
+              <button type="button" @click="editingMethod=false"
+                style="padding:9px 12px; background:transparent; color:var(--muted); border:1.5px solid var(--border); border-radius:8px; font-size:13px; cursor:pointer;">Cancel</button>
+            </template>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <div x-show="settleDueModal.show" class="modal" @click.self="settleDueModal.show = false">
+    <div class="modal-content" style="max-width:520px;">
+      <div class="modal-header">
+        <h2 class="modal-title">Settle Due</h2>
+        <button type="button" @click="settleDueModal.show = false" class="modal-close">&times;</button>
+      </div>
+      <template x-if="settleDueModal.due">
+        <div>
+          <div style="margin-bottom:16px; font-size:13px;">
+            <div style="font-weight:600;" x-text="settleDueModal.due.name || 'Unknown Customer'"></div>
+            <div style="color:var(--muted);" x-text="settleDueModal.due.phone || 'No phone'"></div>
+          </div>
+          <div class="order-summary" style="margin-top:0; padding-top:0; border-top:none;">
+            <div class="order-summary-row"><span>Outstanding Subtotal</span><span x-text="formatCurrency(settleDueModal.due.outstanding_subtotal || 0)"></span></div>
+            <div class="order-summary-row total"><span>Outstanding Payable</span><span x-text="formatCurrency(settleDueModal.due.outstanding_payable || 0)"></span></div>
+          </div>
+          <div style="margin-top:16px;">
+            <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:6px;">Settle Amount</label>
+            <input type="number" min="0" step="0.01" x-model.number="settleDueModal.amount_payable" style="width:100%; font-size:14px; border:1px solid var(--border); border-radius:8px; padding:10px; background:var(--bg);">
+          </div>
+          <div style="margin-top:12px;">
+            <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:6px;">Method</label>
+            <select x-model="settleDueModal.method" style="width:100%; font-size:14px; border:1px solid var(--border); border-radius:8px; padding:10px; background:var(--bg);">
+              <option value="cash">Cash</option>
+              <option value="upi_offline">UPI</option>
+              <option value="card_offline">Card</option>
+            </select>
+          </div>
+          <div style="margin-top:12px;">
+            <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:6px;">Comment</label>
+            <input type="text" x-model="settleDueModal.comment" placeholder="Optional note" style="width:100%; font-size:14px; border:1px solid var(--border); border-radius:8px; padding:10px; background:var(--bg);">
+          </div>
+          <div style="display:flex; gap:8px; margin-top:18px;">
+            <button type="button" @click="submitDueSettlement()" style="flex:1; padding:10px 14px; background:var(--espresso); color:var(--caramel-light); border:none; border-radius:8px; font-weight:600; cursor:pointer;">Save Settlement</button>
+            <button type="button" @click="settleDueModal.show = false" style="padding:10px 14px; background:transparent; color:var(--muted); border:1px solid var(--border); border-radius:8px; cursor:pointer;">Cancel</button>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <script>
+    function historyApp() {
+      return {
+        activeTab: 'bills',
+        loading: true,
+        history: [],
+        dues: [],
+        itemReport: [],
+        staffOptions: [],
+        totalSales: 0,
+        salesByMethod: { cash: 0, card: 0, online: 0, other: 0, due: 0 },
+        settledByOptions: [],
+        billSortOrder: 'desc',
+        filterType: '',
+        filterFrom: '',
+        filterTo: '',
+        filterSettledBy: '',
+        filterStaffId: 'all',
+        dueSearch: '',
+        showModal: false,
+        selectedBill: null,
+        editingMethod: false,
+        editMethod: 'cash',
+        editSplitRows: [],
+        editComment: '',
+        billCfg: {},
+        settleDueModal: { show: false, due: null, amount_payable: 0, method: 'cash', comment: '' },
+        pickupShort(code) {
+          const s = String(code || '');
+          return s ? s.slice(-4) : '';
+        },
+
+        get filtered() {
+          const rows = this.history.filter(b => {
+            if (this.filterType && b.session_type !== this.filterType) return false;
+            return true;
+          });
+          return rows.slice().sort((a, b) => {
+            const left = Number(a?.id || 0);
+            const right = Number(b?.id || 0);
+            return this.billSortOrder === 'asc' ? left - right : right - left;
+          });
+        },
+
+        get filteredDues() {
+          const q = (this.dueSearch || '').trim().toLowerCase();
+          return (this.dues || []).filter(d => {
+            if (!q) return true;
+            return (d.name || '').toLowerCase().includes(q) || (d.phone || '').toLowerCase().includes(q);
+          });
+        },
+
+        get totalOpenDueSubtotal() {
+          return this.filteredDues.reduce((sum, row) => sum + Number(row.outstanding_subtotal || 0), 0);
+        },
+
+        get totalOpenDuePayable() {
+          return this.filteredDues.reduce((sum, row) => sum + Number(row.outstanding_payable || 0), 0);
+        },
+
+        billSubtotal(bill) {
+          return Number(bill?.subtotal ?? 0);
+        },
+
+        billGrossSubtotal(bill) {
+          return Number(bill?.gross_subtotal ?? bill?.subtotal ?? 0);
+        },
+
+        billDiscount(bill) {
+          return Number(bill?.total_discount ?? 0);
+        },
+
+        billTax(bill) {
+          return Number(bill?.tax_amount ?? 0);
+        },
+
+        roundedAmount(amount) {
+          return Math.round(Number(amount || 0));
+        },
+
+        formatRoundedCurrency(amount) {
+          return `\u20B9${this.roundedAmount(amount).toFixed(2)}`;
+        },
+
+        formatCurrency(amount) {
+          return this.formatRoundedCurrency(amount);
+        },
+
+        formatExactCurrency(amount) {
+          return `\u20B9${Number(amount || 0).toFixed(2)}`;
+        },
+
+        historyAmount(bill) {
+          return Number(bill?.history_amount ?? bill?.amount ?? 0);
+        },
+
+        historySplitPayments(bill) {
+          if (Array.isArray(bill?.history_split_payments) && bill.history_split_payments.length) {
+            return bill.history_split_payments;
+          }
+          if (Array.isArray(bill?.split_payments) && bill.split_payments.length) {
+            return bill.split_payments;
+          }
+          return [];
+        },
+
+        startEdit() {
+          const splits = Array.isArray(this.selectedBill?.split_payments) ? this.selectedBill.split_payments : [];
+          if (splits.length > 0) {
+            this.editMethod = 'split';
+            this.editSplitRows = splits.map(s => ({
+              method: s.method || 'cash',
+              amount: Number(s.amount || 0),
+              comment: s.comment || ''
+            }));
+            this.editComment = '';
+          } else {
+            this.editMethod = this.selectedBill.payment_method || 'cash';
+            this.editSplitRows = [];
+            this.editComment = '';
+          }
+          this.editingMethod = true;
+        },
+
+        async saveEdit() {
+          const payload = { payment_method: this.editMethod };
+          if (this.editMethod === 'split') {
+            const rows = this.editSplitRows
+              .map(r => ({ method: r.method || 'cash', amount: Number(r.amount || 0), comment: (r.comment || '').trim() }))
+              .filter(r => r.amount > 0);
+            if (rows.length === 0) { uiAlert('Add at least one split row with amount'); return; }
+            payload.split_payments = rows;
+          } else if (this.editMethod !== 'cash') {
+            payload.split_payments = [{ method: this.editMethod, amount: this.historyAmount(this.selectedBill), comment: (this.editComment || '').trim() }];
+          }
+          const r = await fetch(`/api/bills/${this.selectedBill.id}/edit`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          const d = await r.json().catch(() => ({}));
+          if (r.ok) {
+            this.selectedBill.payment_method = d.payment_method || this.editMethod;
+            this.selectedBill.split_payments = d.split_payments || null;
+            const idx = this.history.findIndex(b => b.id === this.selectedBill.id);
+            if (idx !== -1) {
+              this.history[idx].payment_method = this.selectedBill.payment_method;
+              this.history[idx].split_payments = this.selectedBill.split_payments;
+            }
+          }
+          this.editingMethod = false;
+        },
+
+        addEditSplitRow() {
+          this.editSplitRows.push({ method: 'cash', amount: 0, comment: '' });
+        },
+
+        removeEditSplitRow(i) {
+          this.editSplitRows.splice(i, 1);
+        },
+
+        editSplitTotal() {
+          return this.editSplitRows.reduce((s, r) => s + Number(r.amount || 0), 0);
+        },
+
+        editSplitTargetTotal() {
+          return this.roundedAmount(this.historyAmount(this.selectedBill));
+        },
+
+        editSplitAutoFill(idx) {
+          if (this.editSplitRows.length === 2) {
+            const other = idx === 0 ? 1 : 0;
+            const remaining = parseFloat((this.editSplitTargetTotal() - (parseFloat(this.editSplitRows[idx].amount) || 0)).toFixed(2));
+            this.editSplitRows[other].amount = remaining > 0 ? remaining : 0;
+          }
+        },
+
+        groupedOrders(bill) {
+          const groups = {};
+          for (const item of (bill.items || [])) {
+            const oid = item.order_id || 0;
+            if (!groups[oid]) groups[oid] = { order_id: oid, items: [], kot_comment: item.order_kot_comment, order_kot_printed_at: item.order_kot_printed_at };
+            groups[oid].items.push(item);
+          }
+          return Object.values(groups).sort((a, b) => a.order_id - b.order_id);
+        },
+
+        reprintKOT(bill, grp) {
+          const loc = bill.session_type === 'takeout'
+            ? 'Takeout #' + (this.pickupShort(bill.pickup_code) || '')
+            : 'Table ' + (bill.table_number || '');
+          const items = (grp.items || [])
+            .filter(i => !i.voided && !i.held)
+            .map(i => ({ name: i.name, qty: i.quantity, config: i.config_label || '', notes: i.notes || '' }));
+          const token = bill.session_type === 'takeout' ? this.pickupShort(bill.pickup_code) : bill.table_number;
+          const orderType = bill.session_type === 'takeout' ? 'Takeout' : 'Dine-In';
+          const kotComment = grp.kot_comment || bill.kot_comment || '';
+          if (items.length && window.printKOT) window.printKOT(grp.order_id, loc, items, true, bill.table_number, token, orderType, kotComment, true, grp.order_kot_printed_at);
+        },
+
+        reprintBill(bill) {
+          if (window.printBillReceipt) {
+            // Fix timezone issue: printed_at is stored in UTC but displayed as local
+            // Subtract 5:30 hours to correct the display time
+            const printedAt = bill.printed_at || bill.settled_at;
+            const correctedPrintedAt = printedAt ? new Date(new Date(printedAt).getTime() - (5.5 * 60 * 60 * 1000)) : null;
+            window.printBillReceipt({
+              ...this.billCfg,
+              bill_id:         bill.id,
+              is_reprint:      true,
+              printed_at:      correctedPrintedAt ? correctedPrintedAt.toISOString() : null,
+              print_count:     bill.print_count || 1,
+              session_type:    bill.session_type,
+              table_number:    bill.table_number,
+              pickup_code:     bill.pickup_code,
+              items:           bill.items || [],
+              gross_subtotal:  this.billGrossSubtotal(bill),
+              total_discount:  this.billDiscount(bill),
+              subtotal:        this.billSubtotal(bill),
+              included_due_payable: Number(bill.linked_due_recovered_payable || 0),
+              cgst:            bill.cgst_amount || 0,
+              sgst:            bill.sgst_amount || 0,
+              total:           this.historyAmount(bill),
+              payment_method:  bill.payment_method,
+              split_payments:  this.historySplitPayments(bill) || null,
+              tip:             bill.tip || 0,
+              bill_comment:    bill.bill_comment,
+              customer_name:   bill.customer_name,
+              customer_phone:  bill.customer_phone,
+            });
+          }
+        },
+
+        async init() {
+          const today = new Date().toISOString().split('T')[0];
+          this.filterFrom = today;
+          this.filterTo = today;
+          fetch('/api/config').then(r => r.json()).then(c => {
+            this.billCfg = {
+              restaurant_name: c.restaurant_name || 'Hestia POS',
+              address:         c.address || '',
+              phone:           c.phone || '',
+              gst_number:      c.gst_number || '',
+              fssai_number:    c.fssai_number || '',
+              restaurant_website: c.restaurant_website || '',
+              footer_msg:      c.footer_msg || '',
+              instagram:       c.instagram || '',
+              google_listing:  c.google_listing || '',
+              jurisdiction:    c.jurisdiction || '',
+              cgst_rate:       c.cgst_rate || 0.025,
+              sgst_rate:       c.sgst_rate || 0.025,
+            };
+          }).catch(() => {});
+          await this.loadHistory();
+        },
+
+        async loadHistory() {
+          this.loading = true;
+          try {
+            const params = new URLSearchParams();
+            if (this.filterFrom) params.append('from', this.filterFrom);
+            if (this.filterTo) params.append('to', this.filterTo);
+            if (this.filterSettledBy) params.append('settled_by', this.filterSettledBy);
+            
+            const r = await fetch('/api/bills/history?' + params.toString());
+            const d = await r.json();
+            if (r.ok) {
+              this.history = Array.isArray(d.bills) ? d.bills : [];
+              this.totalSales = d.total_sales || 0;
+              this.salesByMethod = d.sales_by_method || { cash: 0, card: 0, online: 0, other: 0, due: 0 };
+              this.settledByOptions = d.settled_by_options || [];
+            }
+          } catch (e) {
+            console.error('Failed to load history', e);
+          }
+          this.loading = false;
+        },
+
+        async loadDues() {
+          this.loading = true;
+          try {
+            const r = await fetch('/api/bills/dues');
+            const d = await r.json();
+            if (r.ok) {
+              this.dues = Array.isArray(d.dues) ? d.dues : [];
+            }
+          } catch (e) {
+            console.error('Failed to load dues', e);
+          }
+          this.loading = false;
+        },
+
+        async loadItemReport() {
+          this.loading = true;
+          try {
+            const params = new URLSearchParams();
+            if (this.filterFrom) params.append('from', this.filterFrom);
+            if (this.filterTo) params.append('to', this.filterTo);
+            if (this.filterType) params.append('type', this.filterType);
+            if (this.filterStaffId) params.append('staff_id', this.filterStaffId);
+
+            const r = await fetch('/api/bills/item-report?' + params.toString());
+            const d = await r.json();
+            if (r.ok) {
+              this.itemReport = Array.isArray(d.report) ? d.report : [];
+              this.staffOptions = Array.isArray(d.staff_options) ? d.staff_options : [];
+            }
+          } catch (e) {
+            console.error('Failed to load item report', e);
+          }
+          this.loading = false;
+        },
+
+        clearFilters() {
+          this.filterType = '';
+          this.filterFrom = '';
+          this.filterTo = '';
+          this.filterSettledBy = '';
+          this.filterStaffId = 'all';
+          if (this.activeTab === 'bills') this.loadHistory();
+          else if (this.activeTab === 'dues') this.loadDues();
+          else this.loadItemReport();
+        },
+
+        exportCSV() {
+          const rows = this.filtered.slice().sort((a, b) => a.id - b.id);
+          if (rows.length === 0) { uiAlert('No data to export'); return; }
+          const headers = ['Bill No.', 'Basic Subtotal', 'Discount', 'Net Subtotal', 'SGST Amount', 'CGST Amount', 'Previous Due Cleared', 'Round Off', 'Total Payable', 'Cash Amount', 'Card Amount', 'UPI Amount', 'Payment Method Breakdown', 'Payment Notes', 'Settlement Date & Time'];
+          
+          const lines = rows.map(b => {
+            const basic = this.billGrossSubtotal(b);
+            const discount = this.billDiscount(b);
+            const subtotal = this.billSubtotal(b);
+            const total = this.historyAmount(b);
+            const sgst = b.sgst_amount || 0;
+            const cgst = b.cgst_amount || 0;
+            const prevDueCleared = Number(b.linked_due_recovered_payable || 0);
+            const roundOff = Number((this.roundedAmount(total) - (this.roundedAmount(subtotal) + Number(sgst || 0) + Number(cgst || 0) + this.roundedAmount(prevDueCleared))).toFixed(2));
+            const paymentRows = this.exportPaymentRows(b);
+            const cashAmount = this.exportPaymentAmountByBucket(b, 'cash');
+            const cardAmount = this.exportPaymentAmountByBucket(b, 'card');
+            const upiAmount = this.exportPaymentAmountByBucket(b, 'upi');
+            
+            let paymentMode = this.formatPayment(b.effective_payment_method || b.payment_method);
+            let paymentComments = '';
+            if (paymentRows.length > 0) {
+              paymentMode = paymentRows.map(s => `${this.formatPayment(s.method)}: [${this.roundedAmount(s.amount || 0).toFixed(2)}]`).join(', ');
+              paymentComments = paymentRows.map(s => (s.comment || '').trim()).filter(Boolean).join(',');
+            }
+            
+            return [
+              b.id,
+              this.roundedAmount(basic).toFixed(2),
+              this.roundedAmount(discount).toFixed(2),
+              this.roundedAmount(subtotal).toFixed(2),
+              sgst.toFixed(2),
+              cgst.toFixed(2),
+              this.roundedAmount(prevDueCleared).toFixed(2),
+              roundOff.toFixed(2),
+              this.roundedAmount(total).toFixed(2),
+              this.roundedAmount(cashAmount).toFixed(2),
+              this.roundedAmount(cardAmount).toFixed(2),
+              this.roundedAmount(upiAmount).toFixed(2),
+              paymentMode,
+              paymentComments,
+              this.formatDateForExport(b.effective_settled_at || '')
+            ];
+          });
+          
+          const csvContent = [headers, ...lines].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+          const blob = new Blob(['\uFEFF', csvContent], { type: 'text/csv;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.setAttribute('href', url);
+          link.setAttribute('download', `sales_report_${this.filterFrom}_to_${this.filterTo}.csv`);
+          link.style.visibility = 'hidden';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        },
+
+        exportXLSX() {
+          const rows = this.filtered.slice();
+          if (rows.length === 0) { uiAlert('No data to export'); return; }
+          const params = new URLSearchParams();
+          if (this.filterFrom) params.append('from', this.filterFrom);
+          if (this.filterTo) params.append('to', this.filterTo);
+          if (this.filterSettledBy) params.append('settled_by', this.filterSettledBy);
+          const query = params.toString();
+          window.location.href = '/api/bills/history.xlsx' + (query ? `?${query}` : '');
+        },
+
+        formatDate(isoString) {
+          if (!isoString) return '';
+          const m = String(isoString).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+          if (m) {
+            const year = Number(m[1]);
+            const month = Number(m[2]);
+            const day = Number(m[3]);
+            let hour = Number(m[4]);
+            const minute = m[5];
+            const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            const ampm = hour >= 12 ? 'PM' : 'AM';
+            hour = hour % 12 || 12;
+            const mon = months[month - 1] || '';
+            const d = Number.isFinite(day) ? day : '';
+            const h = String(hour).padStart(2, '0');
+            const min = String(minute).padStart(2, '0');
+            if (!mon || !d || !Number.isFinite(year)) return '';
+            return `${mon} ${d}, ${h}:${min} ${ampm}`;
+          }
+          const date = new Date(isoString);
+          if (Number.isNaN(date.getTime())) return '';
+          return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+        },
+
+        formatDateForExport(isoString) {
+          if (!isoString) return '';
+          const m = String(isoString).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+          if (m) {
+            const year = Number(m[1]);
+            const month = Number(m[2]);
+            const day = Number(m[3]);
+            let hour = Number(m[4]);
+            const minute = m[5];
+            const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            const ampm = hour >= 12 ? 'PM' : 'AM';
+            hour = hour % 12 || 12;
+            const mon = months[month - 1] || '';
+            const d = String(day).padStart(2, '0');
+            const h = String(hour).padStart(2, '0');
+            const min = String(minute).padStart(2, '0');
+            if (!mon || !d || !Number.isFinite(year)) return '';
+            return `${year} ${mon} ${d}, ${h}:${min} ${ampm}`;
+          }
+          const date = new Date(isoString);
+          if (Number.isNaN(date.getTime())) return '';
+          return date.toLocaleString('en-US', { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true });
+        },
+
+        formatHistorySettledAt(bill) {
+          if (!bill) return '';
+          if (bill.payment_method === 'due' && bill.due_status !== 'cleared') {
+            return 'Open Due';
+          }
+          return this.formatDate(bill.effective_settled_at || bill.settled_at || '');
+        },
+
+        formatPayment(method) {
+          if (!method) return 'Unpaid';
+          const map = {
+            'cash': 'Cash',
+            'upi': 'UPI',
+            'upi_offline': 'UPI',
+            'card': 'Card',
+            'card_offline': 'Card',
+            'due': 'Due',
+            'multiple': 'Multiple',
+            'razorpay': 'Online (Razorpay)',
+          };
+          return map[method] || method;
+        },
+
+        exportPaymentRows(bill) {
+          if (!bill) return [];
+          const historySplits = this.historySplitPayments(bill);
+          if (historySplits.length > 0) {
+            return historySplits.map(s => ({
+              method: s.method || '',
+              amount: Number(s.amount || 0),
+              comment: (s.comment || '').trim(),
+            })).filter(row => row.amount > 0);
+          }
+          if (Array.isArray(bill.due_settlements) && bill.due_settlements.length > 0) {
+            return bill.due_settlements.map(s => ({
+              method: s.payment_method || '',
+              amount: Number(s.amount_payable || 0),
+              comment: (s.comment || '').trim(),
+            })).filter(row => row.amount > 0);
+          }
+          const method = bill.effective_payment_method || bill.payment_method;
+          const amount = Number(this.historyAmount(bill) || 0);
+          if (amount > 0 && method && method !== 'due') {
+            return [{ method, amount, comment: '' }];
+          }
+          return [];
+        },
+
+        exportPaymentBucket(method) {
+          const value = String(method || '').trim().toLowerCase();
+          if (value.includes('cash')) return 'cash';
+          if (value.includes('card')) return 'card';
+          if (value === 'upi' || value === 'upi_offline') return 'upi';
+          return '';
+        },
+
+        exportPaymentAmountByBucket(bill, bucket) {
+          return this.exportPaymentRows(bill).reduce((sum, row) => {
+            return sum + (this.exportPaymentBucket(row.method) === bucket ? Number(row.amount || 0) : 0);
+          }, 0);
+        },
+
+        paymentSummary(bill) {
+          if (!bill) return 'Unpaid';
+          const historySplits = this.historySplitPayments(bill);
+          if (historySplits.length > 0) {
+            return historySplits.map(s => `${this.formatPayment(s.method)} ${this.formatCurrency(s.amount || 0)}`).join(' + ');
+          }
+          if (Array.isArray(bill.due_settlements) && bill.due_settlements.length > 0) {
+            return bill.due_settlements.map(s => `${this.formatPayment(s.payment_method)} ${this.formatCurrency(s.amount_payable || 0)}`).join(' + ');
+          }
+          const amount = this.historyAmount(bill);
+          if (amount > 0 && (bill.effective_payment_method || bill.payment_method)) {
+            return `${this.formatPayment(bill.effective_payment_method || bill.payment_method)} ${this.formatCurrency(amount)}`;
+          }
+          return this.formatPayment(bill.effective_payment_method || bill.payment_method);
+        },
+
+        exportDueClearedAmount(bill) {
+          if (!bill) return 0;
+          if (bill.payment_method === 'due') {
+            if (Array.isArray(bill.due_settlements) && bill.due_settlements.length > 0) {
+              return bill.due_settlements.reduce((sum, row) => sum + Number(row.amount_payable || 0), 0);
+            }
+            return Number(bill.due_cleared_subtotal || 0);
+          }
+          return 0;
+        },
+
+        openSettleDue(due) {
+          this.settleDueModal = {
+            show: true,
+            due,
+            amount_payable: Number(due?.outstanding_payable || 0),
+            method: 'cash',
+            comment: '',
+          };
+        },
+
+        async submitDueSettlement() {
+          if (!this.settleDueModal.due) return;
+          const payload = {
+            customer_id: this.settleDueModal.due.customer_id,
+            phone: this.settleDueModal.due.phone,
+            amount_payable: Number(this.settleDueModal.amount_payable || 0),
+            method: this.settleDueModal.method,
+            comment: (this.settleDueModal.comment || '').trim(),
+            settled_by: 'main_pos',
+          };
+          const r = await fetch('/api/bills/dues/settle', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          const d = await r.json().catch(() => ({}));
+          if (!r.ok) {
+            uiAlert(d.error || 'Failed to settle due');
+            return;
+          }
+          uiAlert(`Settled ${this.formatCurrency(d.cleared_payable || payload.amount_payable)}. Remaining payable: ${this.formatCurrency(d.remaining_payable || 0)}`);
+          this.settleDueModal.show = false;
+          await Promise.all([this.loadDues(), this.loadHistory()]);
+        },
+      };
+    }
+  </script>
+</body>
+</html>

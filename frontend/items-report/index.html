@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="/fonts.css">
+  <title>Items Report - Hestia POS</title>
+  <link rel="stylesheet" href="/tailwind.css">
+  <script defer src="/alpine.min.js"></script>
+  <style>
+    :root {
+      --cream: #F9F5EE;
+      --cream-dark: #EDE8DC;
+      --espresso: #2C1810;
+      --roast: #7B3F1E;
+      --caramel: #C97B2E;
+      --caramel-light: #E8A84E;
+      --foam: #FDF8F0;
+      --muted: #8C7B6B;
+      --border: rgba(44,24,16,0.12);
+      --border-strong: rgba(44,24,16,0.25);
+      --bg: #F9F5EE;
+      --bg-elevated: #FDF8F0;
+      --text: #2C1810;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 0;
+      background: var(--cream); color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+    }
+    .header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 0 1.5rem; height: 56px;
+      background: var(--espresso);
+      border-bottom: 1px solid var(--border-strong);
+      position: sticky; top: 0; z-index: 100;
+    }
+    .header-title {
+      font-size: 18px; font-family: 'DM Serif Display', serif;
+      color: var(--caramel-light);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .header-btn {
+      background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+      color: #fff; padding: 6px 14px; border-radius: 6px;
+      font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s;
+      font-family: inherit;
+    }
+    .header-btn:hover { background: rgba(255,255,255,0.18); }
+    .main { max-width: 900px; margin: 0 auto; padding: 16px; }
+    .filters {
+      background: var(--bg-elevated); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px;
+      display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end;
+      margin-bottom: 16px;
+    }
+    .filters label {
+      font-size: 11px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; display: block; margin-bottom: 6px;
+    }
+    .filters input, .filters select {
+      background: var(--bg); border: 1px solid var(--border); color: var(--text);
+      padding: 8px 12px; border-radius: 8px; font-size: 13px; font-family: inherit;
+    }
+    .report-table {
+      width: 100%; border-collapse: collapse;
+      background: var(--bg-elevated); border: 1px solid var(--border);
+      border-radius: 12px; overflow: hidden; font-size: 13px;
+    }
+    .report-table thead { background: var(--espresso); color: var(--caramel-light); }
+    .report-table th, .report-table td { padding: 12px 16px; text-align: left; }
+    .report-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .report-table tbody tr { border-bottom: 1px solid var(--border); }
+    .report-table tbody tr:last-child { border-bottom: none; }
+    .loading { text-align: center; padding: 40px; color: var(--muted); font-size: 14px; }
+    .empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+    .empty-icon { font-size: 48px; margin-bottom: 12px; }
+  </style>
+</head>
+<body x-data="itemsReportApp()" x-init="init()">
+  <div class="header">
+    <div class="header-title">
+      <span>📊</span> Items Report
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <button type="button" @click="exportCSV()" class="header-btn">Export CSV</button>
+      <button type="button" @click="window.location.href='/'" class="header-btn">Dashboard</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="filters">
+      <div>
+        <label>Type</label>
+        <select x-model="filterType" @change="loadReport()" style="min-width: 110px;">
+          <option value="">All Types</option>
+          <option value="table">Dine-in</option>
+          <option value="takeout">Takeout</option>
+        </select>
+      </div>
+      <div>
+        <label>KOT Puncher</label>
+        <select x-model="filterStaffId" @change="loadReport()" style="min-width: 130px;">
+          <option value="all">All Staff</option>
+          <option value="main_pos">Main POS</option>
+          <template x-for="s in staffOptions" :key="s.id">
+            <option :value="s.id" x-text="s.name"></option>
+          </template>
+        </select>
+      </div>
+      <div>
+        <label>Category</label>
+        <select x-model="filterCategory" @change="loadReport()" style="min-width: 130px;">
+          <option value="">All Categories</option>
+          <template x-for="c in categories" :key="c">
+            <option :value="c" x-text="c"></option>
+          </template>
+        </select>
+      </div>
+      <div>
+        <label>Search Item</label>
+        <input type="text" x-model="searchQuery" placeholder="Item name..." style="min-width: 160px;">
+      </div>
+      <div>
+        <label>From</label>
+        <input type="date" x-model="filterFrom" @change="loadReport()">
+      </div>
+      <div>
+        <label>To</label>
+        <input type="date" x-model="filterTo" @change="loadReport()">
+      </div>
+      <div style="margin-left: auto;">
+        <button type="button" @click="clearFilters()" style="background: var(--cream-dark); border: none; color: var(--text); padding: 9px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer;">Clear Filters</button>
+      </div>
+    </div>
+
+    <template x-if="loading">
+      <div class="loading">Loading...</div>
+    </template>
+
+    <template x-if="!loading && filteredReport.length === 0">
+      <div class="empty">
+        <div class="empty-icon">📊</div>
+        No items report data found for selected filters
+      </div>
+    </template>
+
+    <template x-if="!loading && filteredReport.length > 0">
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th>Item Name</th>
+            <th style="text-align:center;">Qty Sold</th>
+            <th style="text-align:right;">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="row in filteredReport" :key="row.name">
+            <tr>
+              <td>
+                <div x-text="row.name"></div>
+                <div style="font-size:11px;color:var(--muted);" x-text="row.category"></div>
+              </td>
+              <td style="text-align:center; font-weight:700;" x-text="row.quantity"></td>
+              <td style="text-align:right; font-weight:600;" x-text="formatCurrency(row.amount)"></td>
+            </tr>
+          </template>
+          <tr style="background: var(--cream-dark); font-weight:700;">
+            <td>TOTAL</td>
+            <td style="text-align:center;" x-text="filteredReport.reduce((s,r) => s + r.quantity, 0)"></td>
+            <td style="text-align:right;" x-text="formatCurrency(filteredReport.reduce((s,r) => s + r.amount, 0))"></td>
+          </tr>
+        </tbody>
+      </table>
+    </template>
+  </div>
+
+  <script>
+    function itemsReportApp() {
+      return {
+        loading: true,
+        report: [],
+        staffOptions: [],
+        categories: [],
+        filterType: '',
+        filterFrom: '',
+        filterTo: '',
+        filterStaffId: 'all',
+        filterCategory: '',
+        searchQuery: '',
+
+        get filteredReport() {
+          const q = (this.searchQuery || '').trim().toLowerCase();
+          return this.report.filter(r => {
+            if (!q) return true;
+            const name = (r.name || '').toLowerCase();
+            return name.includes(q);
+          });
+        },
+
+        formatCurrency(amount) {
+          return '\u20B9' + Number(amount || 0).toFixed(2);
+        },
+
+        async init() {
+          const today = new Date().toISOString().split('T')[0];
+          this.filterFrom = today;
+          this.filterTo = today;
+          await this.loadReport();
+        },
+
+        async loadReport() {
+          this.loading = true;
+          try {
+            const params = new URLSearchParams();
+            if (this.filterFrom) params.append('from', this.filterFrom);
+            if (this.filterTo) params.append('to', this.filterTo);
+            if (this.filterType) params.append('type', this.filterType);
+            if (this.filterStaffId) params.append('staff_id', this.filterStaffId);
+            if (this.filterCategory) params.append('category', this.filterCategory);
+
+            const r = await fetch('/api/bills/item-report?' + params.toString());
+            const d = await r.json();
+            if (r.ok) {
+              this.report = Array.isArray(d.report) ? d.report : [];
+              this.staffOptions = Array.isArray(d.staff_options) ? d.staff_options : [];
+              this.categories = Array.isArray(d.categories) ? d.categories : [];
+            }
+          } catch (e) {
+            console.error('Failed to load item report', e);
+          }
+          this.loading = false;
+        },
+
+        clearFilters() {
+          const today = new Date().toISOString().split('T')[0];
+          this.filterType = '';
+          this.filterFrom = today;
+          this.filterTo = today;
+          this.filterStaffId = 'all';
+          this.filterCategory = '';
+          this.searchQuery = '';
+          this.loadReport();
+        },
+
+        exportCSV() {
+          const rows = this.report.map(r => [r.name, r.quantity, Number(r.amount).toFixed(2)]);
+          const totalQty = this.report.reduce((s, r) => s + r.quantity, 0);
+          const totalAmt = this.report.reduce((s, r) => s + r.amount, 0);
+          rows.push(['TOTAL', totalQty, totalAmt.toFixed(2)]);
+
+          let csv = 'Item Name,Quantity,Amount\n';
+          for (const row of rows) {
+            csv += row.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(',') + '\n';
+          }
+
+          const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'items-report.csv';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }
+      };
+    }
+  </script>
+</body>
+</html>

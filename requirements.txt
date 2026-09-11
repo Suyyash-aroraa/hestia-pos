@@ -1,0 +1,8 @@
+flask
+flask-cors
+flask-compress
+flask-sqlalchemy
+waitress
+requests
+openpyxl
+pywin32; sys_platform == 'win32'

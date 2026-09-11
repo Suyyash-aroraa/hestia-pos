@@ -1,0 +1,14 @@
+.venv/
+node_modules/
+__pycache__/
+.pytest_cache/
+data/
+build/
+dist/
+artifacts/
+*.log
+.env
+.env.*
+!.env.example
+*.pem
+*.key

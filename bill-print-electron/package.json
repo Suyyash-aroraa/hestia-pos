@@ -1,0 +1,34 @@
+{
+  "name": "bill-print-electron",
+  "version": "1.0.0",
+  "description": "Silent bill printer for POS - runs on port 5002",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder -w",
+    "package": "electron-builder -w --x64",
+    "package-installer": "electron-builder -w --x64"
+  },
+  "build": {
+    "appId": "com.hestia.billprinter",
+    "productName": "Hestia POS Bill Printer",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "extraFiles": [
+      "qrcode.min.js"
+    ]
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.0"
+  }
+}

@@ -1,0 +1,1725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="/fonts.css">
+  <title>Hestia POS Menu Manager</title>
+  <link rel="stylesheet" href="/tailwind.css">
+  <script src="/shared-dialog.js"></script>
+  <script defer src="/alpine.min.js"></script>
+  <style>
+    :root {
+      --cream: #F9F5EE;
+      --cream-dark: #EDE8DC;
+      --espresso: #2C1810;
+      --espresso-mid: #4A2C1A;
+      --roast: #7B3F1E;
+      --caramel: #C97B2E;
+      --caramel-light: #E8A84E;
+      --foam: #FDF8F0;
+      --muted: #8C7B6B;
+      --border: rgba(44,24,16,0.12);
+      --border-strong: rgba(44,24,16,0.25);
+      --green: #5B6B5A;
+      --bg: #F9F5EE;
+      --bg-elevated: #FDF8F0;
+      --text: #2C1810;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 0;
+      background: var(--cream);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+    }
+    .serif { font-family: 'DM Serif Display', serif; }
+    .header {
+      background: var(--espresso);
+      padding: 1.5rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+    }
+    .header h1 {
+      font-size: 24px;
+      color: var(--caramel-light);
+      margin: 0;
+    }
+    .main {
+      padding: 2rem 4rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .sidebar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 2rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1rem;
+    }
+    .nav-btn {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .nav-btn:hover { color: var(--text); background: var(--cream-dark); }
+    .nav-btn.active { color: var(--caramel); background: var(--cream-dark); }
+    .card {
+      background: var(--foam);
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .card-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin: 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    th {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    tr:last-child td { border-bottom: none; }
+    .btn {
+      background: var(--caramel);
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn:hover { background: var(--roast); }
+    .btn-secondary {
+      background: var(--cream-dark);
+      color: var(--text);
+    }
+    .btn-secondary:hover { background: var(--border-strong); color: var(--text); }
+    .btn-danger {
+      background: #dc2626;
+    }
+    .btn-danger:hover { background: #ef4444; }
+    input, select, textarea {
+      background: var(--foam);
+      border: 1.5px solid var(--border-strong);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 14px;
+      width: 100%;
+      font-family: 'DM Sans', sans-serif;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--caramel);
+    }
+    .form-group { margin-bottom: 12px; }
+    .form-label {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted);
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .badge-toggle {
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      line-height: 1.2;
+      min-width: 44px;
+      transition: opacity 0.15s, transform 0.05s;
+    }
+    .badge-toggle:hover { opacity: 0.85; }
+    .badge-toggle:active { transform: scale(0.96); }
+    .badge-success { background: var(--green); color: white; }
+    .badge-danger { background: #dc2626; color: white; }
+    .modal-overlay {
+      position: fixed;
+      top: 0; right: 0; bottom: 0; left: 0;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .modal {
+      background: var(--foam);
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 500px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    .tbl-wrap { overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <div x-data="menuManager()" x-init="loadMenuItems(); loadNonVeg(); loadInventory(); loadStockOrders(); loadSuppliers(); loadPurchases(); loadCustomers();">
+    <div class="header">
+      <h1 class="serif">Menu Manager</h1>
+    </div>
+
+    <div class="main">
+      <div class="sidebar">
+        <button type="button" @click="tab = 'menu'" :class="tab === 'menu' ? 'nav-btn active' : 'nav-btn'">Menu Items</button>
+        <button type="button" @click="tab = 'customers'" :class="tab === 'customers' ? 'nav-btn active' : 'nav-btn'">Customers</button>
+        <button type="button" @click="tab = 'inventory'" :class="tab === 'inventory' ? 'nav-btn active' : 'nav-btn'">Inventory</button>
+        <button type="button" @click="tab = 'suppliers'" :class="tab === 'suppliers' ? 'nav-btn active' : 'nav-btn'">Suppliers</button>
+        <button type="button" @click="tab = 'purchases'" :class="tab === 'purchases' ? 'nav-btn active' : 'nav-btn'">Purchases</button>
+      </div>
+
+      <!-- Menu Items Tab -->
+      <div x-show="tab === 'menu'">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Menu Items</h2>
+            <button type="button" @click="openItemModal()" class="btn">+ Add Item</button>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
+            <div style="flex:1;min-width:220px;">
+              <input x-model="menuSearch" placeholder="Search by name or category">
+            </div>
+            <div style="width:220px;min-width:200px;">
+              <select x-model="menuCategory">
+                <option value="">All categories</option>
+                <template x-for="c in menuCategories" :key="c">
+                  <option :value="c" x-text="c"></option>
+                </template>
+              </select>
+            </div>
+            <button type="button" class="btn btn-secondary" style="padding:8px 14px;" @click="menuSearch=''; menuCategory=''">Clear</button>
+          </div>
+          <div class="tbl-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Category</th>
+                  <th>Price</th>
+                  <th>Cost</th>
+                  <th>Margin</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="item in filteredMenuItems" :key="item.id">
+                  <tr>
+                    <td style="font-weight:500;">
+                      <span :style="'display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;background:' + (nonVegIds.includes(item.id) ? '#dc2626' : '#16a34a')"></span>
+                      <span x-text="item.name"></span>
+                    </td>
+                    <td x-text="item.category" style="color:var(--muted);font-size:13px;"></td>
+                    <td x-text="'₹' + item.price"></td>
+                    <td x-text="'₹' + (item.cost_price || 0).toFixed(2)" style="color:var(--muted);"></td>
+                    <td>
+                      <span :style="(item.price - (item.cost_price || 0)) / item.price < 0.3 ? 'color:#DC2626;font-weight:600;' : 'color:#059669;font-weight:600;'"
+                        x-text="(((item.price - (item.cost_price || 0)) / item.price) * 100).toFixed(0) + '%'"></span>
+                    </td>
+                    <td>
+                      <button type="button" @click="toggleAvailable(item)" class="badge badge-toggle" :class="item.available ? 'badge-success' : 'badge-danger'" :title="item.available ? 'Click to turn Off' : 'Click to turn On'" x-text="item.available ? 'On' : 'Off'"></button>
+                    </td>
+                    <td style="display:flex;gap:6px;flex-wrap:wrap;">
+                      <button type="button" @click="toggleNonVeg(item)" class="btn btn-secondary" :style="nonVegIds.includes(item.id) ? 'padding:4px 8px;font-size:12px;background:#dc2626;color:#fff;border-color:#dc2626;' : 'padding:4px 8px;font-size:12px;'" x-text="nonVegIds.includes(item.id) ? 'Non' : 'Veg'"></button>
+                      <button type="button" @click="openItemModal(item)" class="btn" style="padding:4px 8px;font-size:12px;">Edit</button>
+                      <button type="button" @click="openConfigsModal(item)" class="btn btn-secondary" style="padding:4px 8px;font-size:12px;">Configs</button>
+                      <button type="button" @click="openIngredientsModal(item)" class="btn btn-secondary" style="padding:4px 8px;font-size:12px;">Recipe</button>
+                    </td>
+                  </tr>
+                </template>
+                <tr x-show="filteredMenuItems.length === 0">
+                  <td colspan="7" style="text-align:center;color:var(--muted);padding:24px;">No menu items yet.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Customers Tab -->
+      <div x-show="tab === 'customers'">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Saved Customers</h2>
+            <button type="button" @click="openCustomerModal()" class="btn">+ Add Customer</button>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
+            <div style="flex:1;min-width:220px;">
+              <input x-model="customerSearch" placeholder="Search by name or phone">
+            </div>
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);">
+              <input type="checkbox" x-model="customersOutstandingOnly" style="width:auto;">
+              <span>Outstanding only</span>
+            </label>
+          </div>
+          <div class="tbl-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Phone</th>
+                  <th>GSTIN</th>
+                  <th>Outstanding</th>
+                  <th>Payable</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="c in filteredCustomers" :key="c.id">
+                  <tr>
+                    <td>
+                      <div x-text="c.name || '—'" style="font-weight:500;"></div>
+                      <div x-show="c.notes" x-text="c.notes" style="font-size:12px;color:var(--muted);margin-top:2px;"></div>
+                    </td>
+                    <td x-text="c.phone || '—'" class="mono"></td>
+                    <td x-text="c.gstin || '—'" class="mono" style="font-size:12px;"></td>
+                    <td x-text="'₹' + Number(c.outstanding_due_subtotal || 0).toFixed(2)" :style="Number(c.outstanding_due_subtotal || 0) > 0 ? 'font-weight:600;color:#C97B2E;' : 'color:var(--muted);'"></td>
+                    <td x-text="'₹' + Number(c.outstanding_due_payable || 0).toFixed(2)" :style="Number(c.outstanding_due_payable || 0) > 0 ? 'font-weight:700;color:#2C1810;' : 'color:var(--muted);'"></td>
+                    <td>
+                      <button type="button" @click="openCustomerModal(c)" class="btn btn-secondary" style="padding:4px 8px;font-size:12px;">Edit</button>
+                    </td>
+                  </tr>
+                </template>
+                <tr x-show="filteredCustomers.length === 0">
+                  <td colspan="6" style="text-align:center;color:var(--muted);padding:24px;">No customers found.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Suppliers Tab -->
+      <div x-show="tab === 'suppliers'">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Suppliers</h2>
+            <button type="button" @click="openSupplierModal()" class="btn">+ Add Supplier</button>
+          </div>
+          <div class="tbl-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Contact</th>
+                  <th>Phone</th>
+                  <th>GSTIN</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="s in suppliers" :key="s.id">
+                  <tr>
+                    <td x-text="s.name" style="font-weight:500;"></td>
+                    <td x-text="s.contact_person || '—'" style="color:var(--muted);font-size:13px;"></td>
+                    <td x-text="s.phone || '—'"></td>
+                    <td x-text="s.gstin || '—'" style="font-family:monospace;font-size:12px;"></td>
+                    <td>
+                      <span class="badge" :class="s.is_active ? 'badge-success' : 'badge-danger'" x-text="s.is_active ? 'Active' : 'Inactive'"></span>
+                    </td>
+                    <td>
+                      <button type="button" @click="openSupplierModal(s)" class="btn btn-secondary" style="padding:4px 8px;font-size:12px;">Edit</button>
+                    </td>
+                  </tr>
+                </template>
+                <tr x-show="suppliers.length === 0">
+                  <td colspan="6" style="text-align:center;color:var(--muted);padding:24px;">No suppliers yet.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Purchases Tab -->
+      <div x-show="tab === 'purchases'">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Purchase Invoices</h2>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="date" x-model="purchaseFilter.from" @change="filterPurchases()" style="font-size:12px;width:auto;">
+              <span style="color:var(--muted);">to</span>
+              <input type="date" x-model="purchaseFilter.to" @change="filterPurchases()" style="font-size:12px;width:auto;">
+              <button type="button" @click="exportPurchasesCSV()" class="btn btn-secondary" style="padding:6px 12px;font-size:12px;">Export CSV</button>
+              <button type="button" @click="printPurchases()" class="btn btn-secondary" style="padding:6px 12px;font-size:12px;">Print</button>
+              <button type="button" @click="openPurchaseModal()" class="btn">+ Record Purchase</button>
+            </div>
+          </div>
+          <div class="tbl-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Invoice #</th>
+                  <th>Date</th>
+                  <th>Supplier</th>
+                  <th>Total Amount</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="pi in filteredPurchases" :key="pi.id">
+                  <tr>
+                    <td x-text="pi.invoice_number" style="font-weight:500;"></td>
+                    <td x-text="formatDate(pi.invoice_date)" style="color:var(--muted);font-size:13px;"></td>
+                    <td x-text="pi.supplier_name"></td>
+                    <td x-text="'₹' + pi.total_amount.toFixed(2)" style="font-weight:600;"></td>
+                    <td>
+                      <span class="badge" :class="pi.status === 'received' ? 'badge-success' : 'badge-danger'" 
+                            style="background: var(--caramel); color: white;" x-show="pi.status === 'ordered'" x-text="pi.status"></span>
+                      <span class="badge badge-success" x-show="pi.status === 'received'" x-text="pi.status"></span>
+                    </td>
+                    <td>
+                      <div style="display:flex;gap:4px;">
+                        <button type="button" @click="viewPurchase(pi)" class="btn btn-secondary" style="padding:4px 8px;font-size:12px;">View</button>
+                        <button type="button" x-show="pi.status === 'ordered'" @click="openReceiveModal(pi)" class="btn" style="padding:4px 8px;font-size:12px;">Receive</button>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+                <tr x-show="purchases.length === 0">
+                  <td colspan="6" style="text-align:center;color:var(--muted);padding:24px;">No purchases yet.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Inventory Tab -->
+      <div x-show="tab === 'inventory'">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Inventory & Stock</h2>
+            <button type="button" @click="openInvModal()" class="btn">+ Add Ingredient</button>
+          </div>
+          <div class="tbl-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Ingredient</th>
+                  <th>Stock Level</th>
+                  <th>Unit</th>
+                  <th>Avg Cost</th>
+                  <th>Last Price</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="inv in inventory" :key="inv.id">
+                  <tr :style="inv.is_low ? 'background:rgba(220,38,38,0.05);' : ''">
+                    <td>
+                      <div x-text="inv.name" style="font-weight:500;"></div>
+                      <div x-show="inv.is_low" style="color:#DC2626;font-size:10px;font-weight:700;">LOW STOCK</div>
+                    </td>
+                    <td x-text="inv.stock_level.toFixed(2)" :style="inv.is_low ? 'color:#DC2626;font-weight:700;' : ''"></td>
+                    <td x-text="inv.unit" style="color:var(--muted);font-size:13px;"></td>
+                    <td x-text="'₹' + (inv.average_unit_cost || 0).toFixed(2)"></td>
+                    <td x-text="'₹' + (inv.last_purchase_price || 0).toFixed(2)" style="color:var(--muted);"></td>
+                    <td style="display:flex;gap:6px;">
+                      <button type="button" @click="openInvModal(inv)" class="btn btn-secondary" style="padding:4px 8px;font-size:12px;">Edit</button>
+                      <button type="button" @click="tab = 'purchases'; openPurchaseModal(); purchaseModal.items = [{inventory_id: inv.id, quantity: '', unit_price: '', gst_rate: 5}]" class="btn" style="padding:4px 8px;font-size:12px;">Restock</button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Item Modal -->
+      <div x-show="itemModal.show" class="modal-overlay" @click.self="itemModal.show = false">
+        <div class="modal">
+          <h3 style="margin:0 0 16px 0;" x-text="itemModal.item ? 'Edit Item' : 'Add Item'"></h3>
+          <div class="form-group">
+            <label class="form-label">Name</label>
+            <input type="text" x-model="itemModal.name">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Category</label>
+            <input type="text" x-model="itemModal.category" list="categoryRecommendations" placeholder="Type or pick a category">
+            <datalist id="categoryRecommendations">
+              <template x-for="c in menuCategories" :key="c">
+                <option :value="c" x-text="c"></option>
+              </template>
+            </datalist>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Price</label>
+            <input type="number" step="0.01" x-model="itemModal.price">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Description</label>
+            <textarea x-model="itemModal.description" rows="3"></textarea>
+          </div>
+          <div class="form-group" x-show="itemModal.item">
+            <label class="form-label">
+              <input type="checkbox" x-model="itemModal.available"> Available
+            </label>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:16px;">
+            <button type="button" @click="saveItem()" class="btn" style="flex:1;">Save</button>
+            <button type="button" x-show="itemModal.item" @click="deleteItem()" class="btn btn-danger" style="padding:8px 16px;">Delete</button>
+            <button type="button" @click="itemModal.show = false" class="btn btn-secondary">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Configs Modal -->
+      <div x-show="configsModal.show" class="modal-overlay" @click.self="configsModal.show = false">
+        <div class="modal" style="max-width:600px;">
+          <h3 style="margin:0 0 16px 0;">Configs for <span x-text="configsModal.item?.name"></span></h3>
+          <div style="margin-bottom:16px;">
+            <button type="button" @click="openConfigModal()" class="btn">+ Add Config Group</button>
+          </div>
+          <template x-for="config in configsModal.configs" :key="config.id">
+            <div style="background:var(--cream-dark);padding:12px;border-radius:8px;margin-bottom:8px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <strong x-text="config.group_name"></strong>
+                <button type="button" @click="deleteConfig(config.id)" class="btn btn-danger" style="padding:4px 8px;font-size:11px;">Delete</button>
+              </div>
+              <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">
+                Options: <span x-text="config.options.map(o=>o.label + (o.extra ? ' (₹' + o.extra + ')' : '')).join(', ')"></span>
+              </div>
+              <div style="font-size:12px;">
+                <span class="badge" :class="config.required ? 'badge-danger' : 'badge-success'" x-text="config.required ? 'Required' : 'Optional'"></span>
+                <span x-show="config.multi_select" class="badge badge-success" style="margin-left:4px;">Multi-select</span>
+              </div>
+            </div>
+          </template>
+          <div x-show="configsModal.configs.length === 0" style="color:var(--muted);padding:16px;text-align:center;">No configs yet.</div>
+          <div style="margin-top:16px;">
+            <button type="button" @click="configsModal.show = false" class="btn btn-secondary">Close</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Config Edit Modal -->
+      <div x-show="configEditModal.show" class="modal-overlay" @click.self="configEditModal.show = false">
+        <div class="modal">
+          <h3 style="margin:0 0 16px 0;" x-text="configEditModal.config ? 'Edit Config' : 'Add Config'"></h3>
+          <div class="form-group">
+            <label class="form-label">Group Name</label>
+            <input type="text" x-model="configEditModal.group_name">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Options (one per line, format: "Label" or "Label:extra_price")</label>
+            <textarea x-model="configEditModal.optionsText" rows="5" placeholder="Half:50&#10;Full&#10;Spicy:20"></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">
+              <input type="checkbox" x-model="configEditModal.required"> Required
+            </label>
+          </div>
+          <div class="form-group">
+            <label class="form-label">
+              <input type="checkbox" x-model="configEditModal.multi_select"> Multi-select
+            </label>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:16px;">
+            <button type="button" @click="saveConfig()" class="btn" style="flex:1;">Save</button>
+            <button type="button" @click="configEditModal.show = false" class="btn btn-secondary">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ingredients Modal -->
+      <div x-show="ingredientsModal.show" class="modal-overlay" @click.self="ingredientsModal.show = false">
+        <div class="modal" style="max-width:500px;">
+          <h3 style="margin:0 0 16px 0;">Recipe for <span x-text="ingredientsModal.item?.name"></span></h3>
+          
+          <div style="margin-bottom:16px;background:var(--foam);padding:12px;border-radius:8px;border:1px solid var(--border);">
+            <div style="font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Estimated Cost</div>
+            <div style="font-size:24px;font-weight:700;color:var(--espresso);" x-text="'₹' + (ingredientsModal.item?.cost_price || 0).toFixed(2)"></div>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px;" x-show="ingredientsModal.item && ingredientsModal.item.price">
+                Margin: <span :style="ingredientsModal.item && ingredientsModal.item.price ? ((ingredientsModal.item.price - (ingredientsModal.item.cost_price || 0)) / ingredientsModal.item.price < 0.3 ? 'color:#DC2626' : 'color:#059669') : ''"
+                x-text="ingredientsModal.item && ingredientsModal.item.price ? (((ingredientsModal.item.price - (ingredientsModal.item.cost_price || 0)) / ingredientsModal.item.price) * 100).toFixed(1) + '%' : '-'"></span>
+            </div>
+          </div>
+
+          <div style="margin-bottom:16px;">
+            <button type="button" @click="openIngredientLinkModal()" class="btn w-full">+ Add Ingredient to Recipe</button>
+          </div>
+
+          <div class="tbl-wrap" style="max-height:300px;overflow-y:auto;">
+            <table class="text-sm">
+              <thead>
+                <tr>
+                  <th>Ingredient</th>
+                  <th>Config</th>
+                  <th>Qty</th>
+                  <th>Cost</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="ing in ingredientsModal.ingredients" :key="ing.id">
+                  <tr>
+                    <td>
+                        <div x-text="ing.name" style="font-weight:500;"></div>
+                        <div style="font-size:10px;color:var(--muted);" x-text="'Avg ₹' + (ing.avg_cost || 0).toFixed(2) + '/' + ing.unit"></div>
+                    </td>
+                    <td>
+                      <span x-show="!ing.config_group" class="text-xs text-muted">Base</span>
+                      <span x-show="ing.config_group" class="text-xs font-semibold" x-text="ing.config_group + ': ' + ing.config_option"></span>
+                    </td>
+                    <td x-text="ing.quantity + ' ' + ing.unit"></td>
+                    <td x-text="'₹' + (ing.line_cost || 0).toFixed(2)" style="font-weight:600;"></td>
+                    <td>
+                      <button type="button" @click="removeIngredient(ing.id)" class="text-red-600 font-bold">✕</button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          
+          <div x-show="ingredientsModal.ingredients.length === 0" style="color:var(--muted);padding:24px;text-align:center;">No ingredients linked to this recipe.</div>
+          
+          <div style="margin-top:16px;">
+            <button type="button" @click="ingredientsModal.show = false" class="btn btn-secondary w-full">Close</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ingredient Link Modal -->
+      <div x-show="ingredientLinkModal.show" class="modal-overlay" @click.self="ingredientLinkModal.show = false">
+        <div class="modal">
+          <h3 style="margin:0 0 16px 0;">Link Ingredient</h3>
+          <div class="form-group">
+            <label class="form-label">Ingredient</label>
+            <select x-model="ingredientLinkModal.inventory_id">
+              <option value="">Select ingredient...</option>
+              <template x-for="inv in inventory" :key="inv.id">
+                <option :value="inv.id" x-text="inv.name"></option>
+              </template>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Quantity</label>
+            <input type="number" step="0.01" x-model="ingredientLinkModal.quantity">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Link to Config (Optional)</label>
+            <div class="grid grid-cols-2 gap-2">
+              <select x-model="ingredientLinkModal.config_group" @change="ingredientLinkModal.config_option = ''">
+                <option value="">Base Recipe</option>
+                <template x-for="c in configsModal.configs" :key="c.id">
+                  <option :value="c.group_name" x-text="c.group_name"></option>
+                </template>
+              </select>
+              <select x-model="ingredientLinkModal.config_option" :disabled="!ingredientLinkModal.config_group">
+                <option value="">Select Option...</option>
+                <template x-for="opt in (configsModal.configs.find(c => c.group_name === ingredientLinkModal.config_group)?.options || [])" :key="opt.label">
+                  <option :value="opt.label" x-text="opt.label"></option>
+                </template>
+              </select>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:16px;">
+            <button type="button" @click="saveIngredientLink()" class="btn" style="flex:1;">Save</button>
+            <button type="button" @click="ingredientLinkModal.show = false" class="btn btn-secondary">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Inventory Modal -->
+      <div x-show="invModal.show" class="modal-overlay" @click.self="invModal.show = false">
+        <div class="modal">
+          <h3 style="margin:0 0 16px 0;" x-text="invModal.inv ? 'Edit Ingredient' : 'Add Ingredient'"></h3>
+          <div class="form-group">
+            <label class="form-label">Name</label>
+            <input type="text" x-model="invModal.name">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Unit</label>
+            <input type="text" x-model="invModal.unit" placeholder="kg, L, pcs, etc.">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Stock Level</label>
+            <input type="number" step="0.01" x-model="invModal.stock_level">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Low Stock Threshold</label>
+            <input type="number" step="0.01" x-model="invModal.low_stock_threshold">
+          </div>
+          <div style="display:flex;gap:8px;margin-top:16px;">
+            <button type="button" @click="saveInventory()" class="btn" style="flex:1;">Save</button>
+            <button type="button" @click="invModal.show = false" class="btn btn-secondary">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Order Stock Modal -->
+      <div x-show="orderStockModal.show" class="modal-overlay" @click.self="orderStockModal.show = false">
+        <div class="modal">
+          <h3 style="margin:0 0 16px 0;">Order Stock</h3>
+          <div class="form-group">
+            <label class="form-label">Ingredient</label>
+            <select x-model="orderStockModal.inventory_id">
+              <option value="">Select ingredient...</option>
+              <template x-for="inv in inventory" :key="inv.id">
+                <option :value="inv.id" x-text="inv.name + ' (Stock: ' + inv.stock_level + ' ' + inv.unit + ')'"></option>
+              </template>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Quantity to Order</label>
+            <input type="number" step="0.01" x-model="orderStockModal.quantity_ordered">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Notes</label>
+            <textarea x-model="orderStockModal.notes" rows="2"></textarea>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:16px;">
+            <button type="button" @click="saveStockOrder()" class="btn" style="flex:1;">Order</button>
+            <button type="button" @click="orderStockModal.show = false" class="btn btn-secondary">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Arrive Modal -->
+      <div x-show="arriveModal.show" class="modal-overlay" @click.self="arriveModal.show = false">
+        <div class="modal" style="max-width:500px;">
+          <h3 style="margin:0 0 16px 0;">Mark Stock as Arrived</h3>
+          <div style="margin-bottom:16px;">
+            <p style="color:var(--muted);margin:0;">Ingredient: <strong x-text="arriveModal.so?.ingredient_name"></strong></p>
+            <p style="color:var(--muted);margin:0;">Ordered: <strong x-text="arriveModal.so?.quantity_ordered + ' ' + arriveModal.so?.unit"></strong></p>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">Quantity Received</label>
+            <input type="number" step="0.01" x-model="arriveModal.quantity_received">
+          </div>
+          
+          <div style="margin:16px 0;padding:12px;background:var(--cream-dark);border-radius:8px;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:12px;">
+              <input type="checkbox" x-model="arriveModal.createInvoice">
+              <span>Create Purchase Invoice</span>
+            </label>
+            
+            <div x-show="arriveModal.createInvoice" style="display:flex;flex-direction:column;gap:12px;">
+              <div class="form-group" style="margin:0;">
+                <label class="form-label">Supplier</label>
+                <select x-model="arriveModal.supplier_id" style="width:100%;">
+                  <option value="">Select...</option>
+                  <template x-for="s in suppliers" :key="s.id">
+                    <option :value="s.id" x-text="s.name"></option>
+                  </template>
+                </select>
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label class="form-label">Invoice Number (optional)</label>
+                <input type="text" x-model="arriveModal.invoice_number" placeholder="Auto-generated if empty">
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div class="form-group" style="margin:0;">
+                  <label class="form-label">Unit Price (₹)</label>
+                  <input type="number" step="0.01" x-model="arriveModal.unit_price">
+                </div>
+                <div class="form-group" style="margin:0;">
+                  <label class="form-label">GST %</label>
+                  <input type="number" step="0.5" x-model="arriveModal.gst_rate" value="5">
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div style="display:flex;gap:8px;margin-top:16px;">
+            <button type="button" @click="confirmArrive()" class="btn" style="flex:1;">Confirm</button>
+            <button type="button" @click="arriveModal.show = false" class="btn btn-secondary">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Supplier Modal -->
+      <div x-show="supplierModal.show" class="modal-overlay" @click.self="supplierModal.show = false">
+        <div class="modal">
+          <h3 style="margin:0 0 16px 0;" x-text="supplierModal.s ? 'Edit Supplier' : 'Add Supplier'"></h3>
+          <div class="form-group">
+            <label class="form-label">Supplier Name</label>
+            <input type="text" x-model="supplierModal.name">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Contact Person</label>
+            <input type="text" x-model="supplierModal.contact_person">
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div class="form-group">
+              <label class="form-label">Phone</label>
+              <input type="text" x-model="supplierModal.phone">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Email</label>
+              <input type="email" x-model="supplierModal.email">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Address</label>
+            <textarea x-model="supplierModal.address" rows="2"></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">GSTIN</label>
+            <input type="text" x-model="supplierModal.gstin" placeholder="22AAAAA0000A1Z5">
+          </div>
+          <div style="display:flex;gap:8px;margin-top:16px;">
+            <button type="button" @click="saveSupplier()" class="btn" style="flex:1;">Save</button>
+            <button type="button" @click="supplierModal.show = false" class="btn btn-secondary">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Purchase Detail View Modal -->
+      <div x-show="purchaseDetailModal.show" class="modal-overlay" @click.self="purchaseDetailModal.show = false" x-cloak>
+        <div class="modal" style="max-width:600px;">
+          <h3 style="margin:0 0 16px 0;">Purchase Invoice Details</h3>
+          <div x-show="purchaseDetailModal.purchase">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+              <div>
+                <div style="font-size:11px;color:var(--muted);font-weight:700;">INVOICE NUMBER</div>
+                <div x-text="purchaseDetailModal.purchase?.invoice_number" style="font-size:16px;font-weight:600;"></div>
+              </div>
+              <div>
+                <div style="font-size:11px;color:var(--muted);font-weight:700;">DATE</div>
+                <div x-text="formatDate(purchaseDetailModal.purchase?.invoice_date)" style="font-size:16px;font-weight:600;"></div>
+              </div>
+              <div>
+                <div style="font-size:11px;color:var(--muted);font-weight:700;">SUPPLIER</div>
+                <div x-text="purchaseDetailModal.purchase?.supplier_name" style="font-size:16px;font-weight:600;"></div>
+              </div>
+              <div>
+                <div style="font-size:11px;color:var(--muted);font-weight:700;">STATUS</div>
+                <span class="badge badge-success" x-text="purchaseDetailModal.purchase?.status"></span>
+              </div>
+            </div>
+            <div style="margin-bottom:16px;">
+              <div style="font-size:11px;color:var(--muted);font-weight:700;">ITEMS</div>
+              <table style="margin-top:8px;font-size:13px;">
+                <thead>
+                  <tr style="background:var(--cream-dark);">
+                    <th style="padding:8px;">Item</th>
+                    <th style="padding:8px;text-align:right;">Ordered</th>
+                    <th style="padding:8px;text-align:right;">Received</th>
+                    <th style="padding:8px;text-align:right;">Unit Price</th>
+                    <th style="padding:8px;text-align:right;">GST</th>
+                    <th style="padding:8px;text-align:right;">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="item in purchaseDetailModal.purchase?.items || []" :key="item.id">
+                    <tr>
+                      <td x-text="item.inventory_name" style="padding:8px;"></td>
+                      <td x-text="item.quantity_ordered" style="padding:8px;text-align:right;"></td>
+                      <td x-text="item.quantity_received || '-'" style="padding:8px;text-align:right;"></td>
+                      <td x-text="'₹' + item.unit_price.toFixed(2)" style="padding:8px;text-align:right;"></td>
+                      <td x-text="item.gst_rate + '%'" style="padding:8px;text-align:right;"></td>
+                      <td x-text="'₹' + item.total.toFixed(2)" style="padding:8px;text-align:right;font-weight:600;"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <div style="border-top:1px solid var(--border);padding-top:16px;text-align:right;">
+              <div style="font-size:24px;font-weight:700;color:var(--caramel);" x-text="'₹' + purchaseDetailModal.purchase?.total_amount?.toFixed(2)"></div>
+              <div style="font-size:12px;color:var(--muted);">Total Amount</div>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;margin-top:16px;">
+            <button type="button" @click="purchaseDetailModal.show = false" class="btn btn-secondary">Close</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Purchase Modal -->
+      <div x-show="purchaseModal.show" class="modal-overlay" @click.self="purchaseModal.show = false">
+        <div class="modal" style="max-width:800px;">
+          <h3 style="margin:0 0 16px 0;">Place Purchase Order</h3>
+          <div class="grid grid-cols-3 gap-4 mb-4">
+            <div class="form-group">
+              <label class="form-label">Supplier</label>
+              <select x-model="purchaseModal.supplier_id">
+                <option value="">Select Supplier...</option>
+                <template x-for="s in suppliers" :key="s.id">
+                  <option :value="s.id" x-text="s.name"></option>
+                </template>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Invoice Number</label>
+              <input type="text" x-model="purchaseModal.invoice_number">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Invoice Date</label>
+              <input type="date" x-model="purchaseModal.invoice_date">
+            </div>
+          </div>
+          
+          <div class="tbl-wrap mb-4">
+            <table class="text-sm">
+              <thead>
+                <tr class="bg-gray-50">
+                  <th>Ingredient</th>
+                  <th width="100">Qty</th>
+                  <th width="120">Unit Price</th>
+                  <th width="100">GST %</th>
+                  <th width="120">Total</th>
+                  <th width="40"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="(item, index) in purchaseModal.items" :key="index">
+                  <tr>
+                    <td>
+                      <select x-model="item.inventory_id" class="text-sm p-1">
+                        <option value="">Select...</option>
+                        <template x-for="inv in inventory" :key="inv.id">
+                          <option :value="inv.id" x-text="inv.name"></option>
+                        </template>
+                      </select>
+                    </td>
+                    <td><input type="number" step="0.01" x-model="item.quantity" class="text-sm p-1"></td>
+                    <td><input type="number" step="0.01" x-model="item.unit_price" class="text-sm p-1"></td>
+                    <td><input type="number" step="0.5" x-model="item.gst_rate" class="text-sm p-1"></td>
+                    <td class="font-semibold" x-text="'₹' + ((item.quantity * item.unit_price) * (1 + (item.gst_rate/100))).toFixed(2)"></td>
+                    <td><button type="button" @click="removePurchaseItem(index)" class="text-red-600 font-bold">✕</button></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <button type="button" @click="addPurchaseItem()" class="btn btn-secondary mb-4 w-full">+ Add Item</button>
+          
+          <div class="flex justify-end items-center gap-4 pt-4 border-t">
+            <div class="text-right">
+              <div class="text-xs text-muted">Grand Total</div>
+              <div class="text-xl font-bold text-espresso" x-text="'₹' + purchaseModal.items.reduce((sum, i) => sum + ((i.quantity * i.unit_price) * (1 + (i.gst_rate/100))), 0).toFixed(2)"></div>
+            </div>
+            <button type="button" @click="savePurchase()" class="btn px-8">Confirm & Order</button>
+            <button type="button" @click="purchaseModal.show = false" class="btn btn-secondary">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Receive Purchase Modal -->
+      <div x-show="receiveModal.show" class="modal-overlay" @click.self="receiveModal.show = false">
+        <div class="modal" style="max-width:800px;">
+          <h3 style="margin:0 0 16px 0;">Receive Purchase Items</h3>
+          <div class="mb-4">
+            <div style="font-size:14px;font-weight:600;" x-text="'Invoice #' + (receiveModal.purchase?.invoice_number || '')"></div>
+            <div style="font-size:12px;color:var(--muted);" x-text="'Supplier: ' + (receiveModal.purchase?.supplier_name || '')"></div>
+          </div>
+          
+          <div class="tbl-wrap mb-4">
+            <table>
+              <thead>
+                <tr class="bg-gray-50">
+                  <th>Ingredient</th>
+                  <th width="120">Qty Ordered</th>
+                  <th width="120">Qty Received</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="item in receiveModal.items" :key="item.id">
+                  <tr>
+                    <td x-text="item.inventory_name"></td>
+                    <td x-text="item.quantity_ordered" class="font-semibold text-center"></td>
+                    <td>
+                      <input type="number" step="0.01" x-model="item.quantity_received" 
+                             class="text-sm p-1 border rounded w-full"
+                             :placeholder="item.quantity_ordered">
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          
+          <div class="flex justify-end gap-4 pt-4 border-t">
+            <button type="button" @click="saveReceive()" class="btn px-8">Confirm & Update Stock</button>
+            <button type="button" @click="receiveModal.show = false" class="btn btn-secondary">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Customer Modal -->
+      <div x-show="customerModal.show" class="modal-overlay" @click.self="customerModal.show = false">
+        <div class="modal">
+          <h3 style="margin:0 0 16px 0;" x-text="customerModal.customer ? 'Edit Customer' : 'Add Customer'"></h3>
+          <div class="form-group">
+            <label class="form-label">Name</label>
+            <input type="text" x-model="customerModal.name">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Phone</label>
+            <input type="text" x-model="customerModal.phone">
+          </div>
+          <div class="form-group">
+            <label class="form-label">GSTIN</label>
+            <input type="text" x-model="customerModal.gstin">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Address</label>
+            <textarea x-model="customerModal.address" rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Notes</label>
+            <textarea x-model="customerModal.notes" rows="3"></textarea>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;">
+            <button type="button" @click="customerModal.show = false" class="btn btn-secondary">Cancel</button>
+            <button type="button" @click="saveCustomer()" class="btn">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function menuManager() {
+      return {
+        tab: 'menu',
+        menuItems: [],
+        nonVegIds: [],
+        menuSearch: '',
+        menuCategory: '',
+        customers: [],
+        customerSearch: '',
+        customersOutstandingOnly: false,
+        inventory: [],
+        stockOrders: [],
+        showAllOrders: false,
+        
+        itemModal: { show: false, item: null, name: '', category: '', price: '', description: '', available: true },
+        configsModal: { show: false, item: null, configs: [] },
+        configEditModal: { show: false, config: null, group_name: '', optionsText: '', required: true, multi_select: false },
+        ingredientsModal: { show: false, item: null, ingredients: [] },
+        ingredientLinkModal: { show: false, inventory_id: '', quantity: 1, config_group: '', config_option: '' },
+        invModal: { show: false, inv: null, name: '', unit: '', stock_level: 0, low_stock_threshold: 0 },
+        customerModal: { show: false, customer: null, name: '', phone: '', gstin: '', address: '', notes: '' },
+        suppliers: [],
+        purchases: [],
+        supplierModal: { show: false, s: null, name: '', contact_person: '', phone: '', email: '', address: '', gstin: '' },
+        purchaseModal: { show: false, supplier_id: '', invoice_number: '', invoice_date: new Date().toISOString().split('T')[0], items: [] },
+        receiveModal: { show: false, purchase: null, items: [] },
+        purchaseDetailModal: { show: false, purchase: null },
+        purchaseFilter: { from: '', to: '' },
+        orderStockModal: { show: false, inventory_id: '', quantity_ordered: '', notes: '' },
+        arriveModal: { show: false, so: null, quantity_received: '' },
+
+        get lowStockItems() {
+          return this.inventory.filter(i => i.is_low);
+        },
+
+        get menuCategories() {
+          const cats = (this.menuItems || [])
+            .map(i => (i.category || '').trim())
+            .filter(Boolean);
+          return Array.from(new Set(cats)).sort((a, b) => a.localeCompare(b));
+        },
+
+        get filteredMenuItems() {
+          const q = (this.menuSearch || '').trim().toLowerCase();
+          const cat = (this.menuCategory || '').trim().toLowerCase();
+          return (this.menuItems || []).filter(i => {
+            const name = (i.name || '').toLowerCase();
+            const icat = (i.category || '').toLowerCase();
+            if (cat && icat !== cat) return false;
+            if (q && !(name.includes(q) || icat.includes(q))) return false;
+            return true;
+          });
+        },
+
+        get filteredCustomers() {
+          const q = (this.customerSearch || '').trim().toLowerCase();
+          return (this.customers || []).filter(c => {
+            if (this.customersOutstandingOnly && Number(c.outstanding_due_subtotal || 0) <= 0) return false;
+            if (!q) return true;
+            return (c.name || '').toLowerCase().includes(q) || (c.phone || '').toLowerCase().includes(q);
+          });
+        },
+
+        async loadMenuItems() {
+          const r = await fetch('/api/menu-manager/menu/all');
+          this.menuItems = await r.json();
+        },
+
+        async loadNonVeg() {
+          const r = await fetch('/api/menu-manager/non-veg');
+          this.nonVegIds = await r.json();
+        },
+
+        async toggleNonVeg(item) {
+          const r = await fetch(`/api/menu-manager/non-veg/toggle/${item.id}`, { method: 'POST' });
+          if (r.ok) { await this.loadNonVeg(); }
+        },
+
+        async loadCustomers() {
+          const r = await fetch('/api/menu-manager/customers');
+          this.customers = await r.json();
+        },
+
+        openCustomerModal(customer = null) {
+          this.customerModal = {
+            show: true,
+            customer,
+            name: customer?.name || '',
+            phone: customer?.phone || '',
+            gstin: customer?.gstin || '',
+            address: customer?.address || '',
+            notes: customer?.notes || '',
+          };
+        },
+
+        async saveCustomer() {
+          const payload = {
+            name: (this.customerModal.name || '').trim(),
+            phone: (this.customerModal.phone || '').trim(),
+            gstin: (this.customerModal.gstin || '').trim(),
+            address: (this.customerModal.address || '').trim(),
+            notes: (this.customerModal.notes || '').trim(),
+          };
+          const url = this.customerModal.customer
+            ? `/api/menu-manager/customers/${this.customerModal.customer.id}`
+            : '/api/menu-manager/customers';
+          const method = this.customerModal.customer ? 'PUT' : 'POST';
+          const r = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          const d = await r.json().catch(() => ({}));
+          if (!r.ok) {
+            uiAlert(d.error || 'Error saving customer');
+            return;
+          }
+          this.customerModal.show = false;
+          await this.loadCustomers();
+        },
+
+        async loadInventory() {
+          const r = await fetch('/api/menu-manager/inventory');
+          this.inventory = await r.json();
+        },
+
+        async loadStockOrders() {
+          const url = this.showAllOrders ? '/api/menu-manager/stock-orders' : '/api/menu-manager/stock-orders?status=pending';
+          const r = await fetch(url);
+          this.stockOrders = await r.json();
+        },
+
+        openItemModal(item = null) {
+          this.itemModal = {
+            show: true,
+            item,
+            name: item?.name || '',
+            category: item?.category || '',
+            price: item?.price || '',
+            description: item?.description || '',
+            available: item?.available !== undefined ? item.available : true
+          };
+        },
+
+        async saveItem() {
+          const data = {
+            name: this.itemModal.name,
+            category: this.itemModal.category,
+            price: parseFloat(this.itemModal.price),
+            description: this.itemModal.description,
+            available: this.itemModal.available
+          };
+          const url = this.itemModal.item ? `/api/menu-manager/menu/${this.itemModal.item.id}` : '/api/menu-manager/menu';
+          const method = this.itemModal.item ? 'PUT' : 'POST';
+          const r = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+          });
+          if (r.ok) {
+            this.itemModal.show = false;
+            this.loadMenuItems();
+          }
+        },
+
+        async toggleAvailable(item) {
+            const r = await fetch(`/api/menu-manager/menu/${item.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ available: !item.available })
+            });
+            if (r.ok) {
+                item.available = !item.available;
+            }
+        },
+
+        async deleteItem() {
+            if (!await uiConfirm('This menu item will be removed permanently.', { title: 'Delete menu item?', variant: 'danger', confirmText: 'Delete' })) {
+                return;
+            }
+            const r = await fetch(`/api/menu-manager/menu/${this.itemModal.item.id}`, {
+                method: 'DELETE',
+            });
+            if (r.ok) {
+                this.itemModal.show = false;
+                await this.loadMenuItems();
+            }
+        },
+
+        async openConfigsModal(item) {
+          this.configsModal.item = item;
+          const r = await fetch(`/api/menu-manager/menu/${item.id}/configs`);
+          this.configsModal.configs = await r.json();
+          this.configsModal.show = true;
+        },
+
+        openConfigModal(config = null) {
+          this.configEditModal = {
+            show: true,
+            config,
+            group_name: config?.group_name || '',
+            optionsText: config?.options ? config.options.map(o => o.label + (o.extra ? ':' + o.extra : '')).join('\n') : '',
+            required: config?.required !== undefined ? config.required : true,
+            multi_select: config?.multi_select || false
+          };
+        },
+
+        async saveConfig() {
+          const options = this.configEditModal.optionsText.split('\n').filter(l => l.trim()).map(l => {
+            const parts = l.split(':');
+            if (parts.length === 2) {
+              return { label: parts[0].trim(), extra: parseFloat(parts[1]) || 0 };
+            }
+            return { label: l.trim(), extra: 0 };
+          });
+          const data = {
+            group_name: this.configEditModal.group_name,
+            options,
+            required: this.configEditModal.required,
+            multi_select: this.configEditModal.multi_select
+          };
+          const itemId = this.configsModal.item.id;
+          let url = `/api/menu-manager/menu/${itemId}/configs`;
+          let method = 'POST';
+          if (this.configEditModal.config) {
+            url += `/${this.configEditModal.config.id}`;
+            method = 'PUT';
+          }
+          const r = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+          });
+          if (r.ok) {
+            this.configEditModal.show = false;
+            this.openConfigsModal(this.configsModal.item);
+          }
+        },
+
+        async deleteConfig(configId) {
+          if (!await uiConfirm('This option group will be removed from the item.', { title: 'Delete config?', variant: 'danger', confirmText: 'Delete' })) return;
+          const r = await fetch(`/api/menu-manager/menu/${this.configsModal.item.id}/configs/${configId}`, { method: 'DELETE' });
+          if (r.ok) {
+            this.openConfigsModal(this.configsModal.item);
+          }
+        },
+
+        async openIngredientsModal(item) {
+          this.ingredientsModal.item = item;
+          try {
+            // Load ingredients
+            const r = await fetch(`/api/menu-manager/menu-items/${item.id}/cost`);
+            if (r.ok) {
+              const data = await r.json();
+              this.ingredientsModal.ingredients = data.ingredients || [];
+            }
+            
+            // Load configs for selection in link modal
+            const cr = await fetch(`/api/menu-manager/menu/${item.id}/configs`);
+            if (cr.ok) {
+              this.configsModal.configs = await cr.json();
+            }
+          } catch (e) {
+            console.error('Error fetching ingredients/configs:', e);
+          }
+          this.ingredientsModal.show = true;
+        },
+
+        openIngredientLinkModal() {
+          this.ingredientLinkModal = { show: true, inventory_id: '', quantity: 1, config_group: '', config_option: '' };
+        },
+
+        async saveIngredientLink() {
+          const r = await fetch(`/api/menu-manager/menu/${this.ingredientsModal.item.id}/ingredients`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              inventory_id: this.ingredientLinkModal.inventory_id,
+              quantity: parseFloat(this.ingredientLinkModal.quantity),
+              config_group: this.ingredientLinkModal.config_group || null,
+              config_option: this.ingredientLinkModal.config_option || null
+            })
+          });
+          if (r.ok) {
+            this.ingredientLinkModal.show = false;
+            // Refresh the ingredients modal with updated cost data
+            this.openIngredientsModal(this.ingredientsModal.item);
+            // Also reload menu items for consistency
+            this.loadMenuItems();
+          }
+        },
+
+        async removeIngredient(riId) {
+          if (!await uiConfirm('This ingredient will no longer be deducted when the item is sold.', { title: 'Remove ingredient?', variant: 'danger', confirmText: 'Remove' })) return;
+          const r = await fetch(`/api/menu-manager/menu/${this.ingredientsModal.item.id}/ingredients/${riId}`, {
+            method: 'DELETE'
+          });
+          if (r.ok) {
+            // Refresh the ingredients modal with updated cost data
+            this.openIngredientsModal(this.ingredientsModal.item);
+            // Also reload menu items for consistency
+            this.loadMenuItems();
+          }
+        },
+
+        openInvModal(inv = null) {
+          this.invModal = {
+            show: true,
+            inv,
+            name: inv?.name || '',
+            unit: inv?.unit || '',
+            stock_level: inv?.stock_level || 0,
+            low_stock_threshold: inv?.low_stock_threshold || 0
+          };
+        },
+
+        async saveInventory() {
+          const data = {
+            name: this.invModal.name,
+            unit: this.invModal.unit,
+            stock_level: parseFloat(this.invModal.stock_level),
+            low_stock_threshold: parseFloat(this.invModal.low_stock_threshold)
+          };
+          const url = this.invModal.inv ? `/api/menu-manager/inventory/${this.invModal.inv.id}` : '/api/menu-manager/inventory/items';
+          const method = this.invModal.inv ? 'PUT' : 'POST';
+          const r = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+          });
+          if (r.ok) {
+            this.invModal.show = false;
+            this.loadInventory();
+          }
+        },
+
+        async deleteInv(id) {
+          if (!await uiConfirm('This ingredient will be removed from inventory permanently.', { title: 'Delete ingredient?', variant: 'danger', confirmText: 'Delete' })) return;
+          const r = await fetch(`/api/menu-manager/inventory/${id}`, { method: 'DELETE' });
+          if (r.ok) {
+            this.loadInventory();
+          }
+        },
+
+        async disableAffected() {
+          if (!await uiConfirm('Every menu item that uses a low-stock ingredient will be marked unavailable.', { title: 'Disable affected items?', variant: 'warn', confirmText: 'Disable items' })) return;
+          const r = await fetch('/api/menu-manager/inventory/disable-affected', { method: 'POST' });
+          if (r.ok) {
+            const d = await r.json();
+            uiAlert(`Disabled ${d.count} items.`);
+            this.loadMenuItems();
+            this.loadInventory();
+          }
+        },
+
+        openOrderStockModal() {
+          this.orderStockModal = { show: true, inventory_id: '', quantity_ordered: '', notes: '' };
+        },
+
+        async saveStockOrder() {
+          const r = await fetch('/api/menu-manager/stock-orders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              inventory_id: parseInt(this.orderStockModal.inventory_id),
+              quantity_ordered: parseFloat(this.orderStockModal.quantity_ordered),
+              notes: this.orderStockModal.notes
+            })
+          });
+          if (r.ok) {
+            this.orderStockModal.show = false;
+            this.loadStockOrders();
+            this.loadInventory();
+          }
+        },
+
+        openArriveModal(so) {
+          this.arriveModal = { 
+            show: true, 
+            so, 
+            quantity_received: so.quantity_ordered,
+            createInvoice: false,
+            supplier_id: '',
+            invoice_number: '',
+            unit_price: so.last_purchase_price || '',
+            gst_rate: 5
+          };
+        },
+
+        async confirmArrive() {
+          const payload = { 
+            quantity_received: parseFloat(this.arriveModal.quantity_received) 
+          };
+          
+          if (this.arriveModal.createInvoice && this.arriveModal.supplier_id) {
+            payload.supplier_id = parseInt(this.arriveModal.supplier_id);
+            payload.invoice_number = this.arriveModal.invoice_number || undefined;
+            payload.unit_price = parseFloat(this.arriveModal.unit_price) || 0;
+            payload.gst_rate = parseFloat(this.arriveModal.gst_rate) || 5;
+          }
+          
+          const r = await fetch(`/api/menu-manager/stock-orders/${this.arriveModal.so.id}/arrive`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          
+          if (r.ok) {
+            const result = await r.json();
+            this.arriveModal.show = false;
+            this.loadStockOrders();
+            this.loadInventory();
+            if (result.purchase_invoice_id) {
+              this.loadPurchases();  // Refresh purchases list
+              uiAlert(`Stock arrived and Purchase Invoice #${result.purchase_invoice_id} created!`);
+            }
+          }
+        },
+
+        async cancelOrder(id) {
+          if (!await uiConfirm('This stock order will be cancelled and removed.', { title: 'Cancel stock order?', variant: 'danger', confirmText: 'Cancel order', cancelText: 'Keep order' })) return;
+          const r = await fetch(`/api/menu-manager/stock-orders/${id}`, { method: 'DELETE' });
+          if (r.ok) {
+            this.loadStockOrders();
+          }
+        },
+
+        async loadPurchases() {
+          const r = await fetch('/api/menu-manager/purchase-invoices');
+          this.purchases = await r.json();
+        },
+
+        get filteredPurchases() {
+          return this.purchases.filter(pi => {
+            const date = new Date(pi.invoice_date);
+            if (this.purchaseFilter.from && date < new Date(this.purchaseFilter.from)) return false;
+            if (this.purchaseFilter.to && date > new Date(this.purchaseFilter.to)) return false;
+            return true;
+          });
+        },
+
+        async viewPurchase(pi) {
+          // Fetch full details with items
+          const r = await fetch(`/api/menu-manager/purchase-invoices/${pi.id}`);
+          if (r.ok) {
+            const details = await r.json();
+            this.purchaseDetailModal = { show: true, purchase: details };
+          } else {
+            // Fallback to basic data if API fails
+            this.purchaseDetailModal = { show: true, purchase: pi };
+          }
+        },
+
+        filterPurchases() {
+          // filteredPurchases is a computed property
+        },
+
+        async exportPurchasesCSV() {
+          const escapeCsv = (v) => {
+            if (v === null || v === undefined) return '""';
+            const s = String(v);
+            return `"${s.replace(/"/g, '""')}"`;
+          };
+
+          const purchases = this.filteredPurchases || [];
+          if (purchases.length === 0) { uiAlert('No purchases to export'); return; }
+
+          const detailed = await Promise.all(purchases.map(async (pi) => {
+            if (pi && Array.isArray(pi.items) && pi.items.length > 0) return pi;
+            try {
+              const r = await fetch(`/api/menu-manager/purchase-invoices/${pi.id}`);
+              if (r.ok) return await r.json();
+            } catch (e) {}
+            return pi;
+          }));
+
+          const headers = [
+            'Invoice Number',
+            'Date',
+            'Supplier',
+            'Status',
+            'Invoice Total',
+            'Item',
+            'Qty',
+            'Unit Price',
+            'GST %',
+            'Line Total',
+          ];
+
+          const lines = [headers.map(escapeCsv).join(',')];
+          for (const pi of detailed) {
+            const items = (pi && Array.isArray(pi.items)) ? pi.items : [];
+            if (items.length === 0) {
+              const row = {
+                'Invoice Number': pi?.invoice_number || '',
+                'Date': pi?.invoice_date || '',
+                'Supplier': pi?.supplier_name || '',
+                'Status': pi?.status || '',
+                'Invoice Total': (pi?.total_amount ?? ''),
+                'Item': '',
+                'Qty': '',
+                'Unit Price': '',
+                'GST %': '',
+                'Line Total': '',
+              };
+              lines.push(headers.map(h => escapeCsv(row[h])).join(','));
+              continue;
+            }
+
+            for (const it of items) {
+              const qty = it.quantity ?? it.quantity_received ?? it.quantity_ordered ?? '';
+              const row = {
+                'Invoice Number': pi?.invoice_number || '',
+                'Date': pi?.invoice_date || '',
+                'Supplier': pi?.supplier_name || '',
+                'Status': pi?.status || '',
+                'Invoice Total': (pi?.total_amount ?? ''),
+                'Item': it.inventory_name || it.name || '',
+                'Qty': qty,
+                'Unit Price': (it.unit_price ?? ''),
+                'GST %': (it.gst_rate ?? ''),
+                'Line Total': (it.total ?? ''),
+              };
+              lines.push(headers.map(h => escapeCsv(row[h])).join(','));
+            }
+          }
+
+          const csv = lines.join('\n');
+          const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `purchases_detailed_${new Date().toISOString().split('T')[0]}.csv`;
+          a.click();
+          URL.revokeObjectURL(url);
+        },
+
+        printPurchases() {
+          const printWindow = window.open('', '_blank');
+          
+          // Generate detailed view for each purchase
+          const purchasesHtml = this.filteredPurchases.map(pi => {
+            const itemsRows = (pi.items || []).map(item => `
+              <tr>
+                <td>${item.inventory_name || 'N/A'}</td>
+                <td style="text-align:right">${item.quantity}</td>
+                <td style="text-align:right">₹${(item.unit_price || 0).toFixed(2)}</td>
+                <td style="text-align:right">${item.gst_rate || 0}%</td>
+                <td style="text-align:right">₹${(item.total || 0).toFixed(2)}</td>
+              </tr>
+            `).join('');
+            
+            return `
+              <div style="margin-bottom:30px;page-break-inside:avoid;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:10px;">
+                  <div>
+                    <strong>Invoice:</strong> ${pi.invoice_number}<br>
+                    <strong>Supplier:</strong> ${pi.supplier_name}<br>
+                    <strong>Date:</strong> ${this.formatDate(pi.invoice_date)}
+                  </div>
+                  <div style="text-align:right;">
+                    <strong>Status:</strong> ${pi.status}<br>
+                    <strong>Total:</strong> ₹${pi.total_amount.toFixed(2)}
+                  </div>
+                </div>
+                <table style="width:100%;border-collapse:collapse;margin-top:10px;font-size:12px;">
+                  <thead>
+                    <tr style="background:#f0f0f0;">
+                      <th style="border:1px solid #ccc;padding:6px;text-align:left;">Item</th>
+                      <th style="border:1px solid #ccc;padding:6px;text-align:right;">Qty</th>
+                      <th style="border:1px solid #ccc;padding:6px;text-align:right;">Unit Price</th>
+                      <th style="border:1px solid #ccc;padding:6px;text-align:right;">GST</th>
+                      <th style="border:1px solid #ccc;padding:6px;text-align:right;">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${itemsRows || '<tr><td colspan="5" style="border:1px solid #ccc;padding:6px;text-align:center;">No items</td></tr>'}
+                  </tbody>
+                </table>
+                <hr style="margin-top:20px;border:none;border-top:1px solid #ddd;">
+              </div>
+            `;
+          }).join('');
+          
+          printWindow.document.write(`
+            <html>
+            <head><title>Purchase Invoices - Detailed View</title>
+            <style>
+              body{font-family:Arial;margin:20px;}
+              h2{margin-bottom:5px;}
+              .summary{margin-bottom:20px;color:#666;font-size:14px;}
+            </style>
+            </head>
+            <body>
+              <h2>Purchase Invoices - Detailed View</h2>
+              <div class="summary">Total Invoices: ${this.filteredPurchases.length} | Date Range: ${this.purchaseFilter.from || 'All'} to ${this.purchaseFilter.to || 'All'}</div>
+              ${purchasesHtml}
+            </body>
+            </html>
+          `);
+          printWindow.document.close();
+          printWindow.print();
+        },
+
+        async loadSuppliers() {
+          const r = await fetch('/api/menu-manager/suppliers');
+          this.suppliers = await r.json();
+        },
+
+        openSupplierModal(s = null) {
+          this.supplierModal = {
+            show: true,
+            s,
+            name: s?.name || '',
+            contact_person: s?.contact_person || '',
+            phone: s?.phone || '',
+            email: s?.email || '',
+            address: s?.address || '',
+            gstin: s?.gstin || ''
+          };
+        },
+
+        async saveSupplier() {
+          const url = this.supplierModal.s ? `/api/menu-manager/suppliers/${this.supplierModal.s.id}` : '/api/menu-manager/suppliers';
+          const method = this.supplierModal.s ? 'PUT' : 'POST';
+          const r = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(this.supplierModal)
+          });
+          if (r.ok) {
+            this.supplierModal.show = false;
+            this.loadSuppliers();
+          }
+        },
+
+        openPurchaseModal() {
+          this.purchaseModal = {
+            show: true,
+            supplier_id: '',
+            invoice_number: '',
+            invoice_date: new Date().toISOString().split('T')[0],
+            items: [{ inventory_id: '', quantity: '', unit_price: '', gst_rate: 5 }]
+          };
+        },
+
+        addPurchaseItem() {
+          this.purchaseModal.items.push({ inventory_id: '', quantity: '', unit_price: '', gst_rate: 5 });
+        },
+
+        removePurchaseItem(index) {
+          this.purchaseModal.items.splice(index, 1);
+        },
+
+        async savePurchase() {
+          const r = await fetch('/api/menu-manager/purchase-invoices', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(this.purchaseModal)
+          });
+          if (r.ok) {
+            this.purchaseModal.show = false;
+            this.loadPurchases();
+          } else {
+            const d = await r.json();
+            uiAlert(d.error || 'Error saving purchase');
+          }
+        },
+
+        openReceiveModal(pi) {
+          this.receiveModal = {
+            show: true,
+            purchase: pi,
+            items: pi.items.map(it => ({
+              ...it,
+              quantity_received: it.quantity_ordered
+            }))
+          };
+        },
+
+        async saveReceive() {
+          const r = await fetch(`/api/menu-manager/purchase-invoices/${this.receiveModal.purchase.id}/receive`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items: this.receiveModal.items })
+          });
+          if (r.ok) {
+            this.receiveModal.show = false;
+            this.loadPurchases();
+            this.loadInventory();
+            this.loadMenuItems(); // Cost prices might change
+          } else {
+            const d = await r.json();
+            uiAlert(d.error || 'Error receiving purchase');
+          }
+        },
+
+        formatDate(dateStr) {
+          if (!dateStr) return '';
+          return new Date(dateStr).toLocaleDateString();
+        }
+      };
+    }
+  </script>
+</body>
+</html>
